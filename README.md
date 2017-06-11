@@ -8,7 +8,7 @@ To be continued...
 
 License
 -------
-Copyright 2017 Andrey Fomenkov
+    Copyright 2017 Andrey Fomenkov
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
