@@ -5,7 +5,7 @@ import core.GreenCat;
 
 import javax.swing.*;
 
-public enum MessageType {
+public enum DialogMessageType {
 
     INFO(GreenCat.PLUGIN_NAME, Messages.getInformationIcon()),
     ERROR("Error", Messages.getErrorIcon()),
@@ -15,7 +15,7 @@ public enum MessageType {
     private final String title;
     private final Icon icon;
 
-    MessageType(String title, Icon icon) {
+    DialogMessageType(String title, Icon icon) {
         this.title = title;
         this.icon = icon;
     }

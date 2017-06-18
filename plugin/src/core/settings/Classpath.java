@@ -1,4 +1,4 @@
-package core.input;
+package core.settings;
 
 import com.google.common.collect.ImmutableList;
 

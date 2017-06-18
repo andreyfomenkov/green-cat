@@ -33,13 +33,13 @@
   <!-- Actions -->
   <actions>
 
-    <!-- DeployAction -->
-    <action id="GreenCat.Deploy" class="ui.action.DeployAction" text="Deploy" description="Deploy Changes to Android Device" icon="/icons/deploy.png">
+    <!-- Deploy -->
+    <action id="GreenCat.Deploy" class="ui.action.Deploy" text="Deploy" description="Deploy Changes to Android Device" icon="/icons/deploy.png">
       <add-to-group group-id="RunnerActions" anchor="after" relative-to-action="Run"/>
     </action>
 
-    <!-- CleanAction -->
-    <action id="GreenCat.Clean" class="ui.action.CleanAction" text="Clean Changes" description="Clean Build Directory" icon="/icons/clean.png">
+    <!-- Clean -->
+    <action id="GreenCat.Clean" class="ui.action.Clean" text="Clean Changes" description="Clean Build Directory" icon="/icons/clean.png">
       <add-to-group group-id="RunnerActions" anchor="after" relative-to-action="Run"/>
     </action>
 

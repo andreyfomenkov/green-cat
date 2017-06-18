@@ -1,4 +1,4 @@
-package core.input;
+package core.settings;
 
 public class ProjectSettings {
 
