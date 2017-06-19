@@ -10,5 +10,6 @@
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="library" exported="" name="com.hp.gagawa:gagawa:1.0.1" level="project" />
+    <orderEntry type="library" exported="" name="org.apache.directory.studio:org.apache.commons.io:2.4" level="project" />
   </component>
 </module>

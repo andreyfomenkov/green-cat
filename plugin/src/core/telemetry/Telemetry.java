@@ -1,60 +1,76 @@
 package core.telemetry;
 
+import ui.window.TelemetryToolWindow;
+
 import java.util.ArrayList;
 import java.util.List;
 
-import static ui.util.Utils.isNullOrEmpty;
-
 public class Telemetry {
 
-    private final List<Step> stepList = new ArrayList<>();
-
-    private Telemetry() {
+    private enum Type {
+        MESSAGE,
+        WARNING,
+        ERROR,
+        GREEN
     }
 
-    public static class Builder {
+    private static class MessageItem {
 
-        private final Telemetry telemetry;
+        public final Type type;
+        public final String value;
 
-        public Builder() {
-            telemetry = new Telemetry();
-        }
-
-        public Builder add(Step step) {
-            telemetry.stepList.add(step);
-            return this;
-        }
-
-        public Telemetry build() {
-            return telemetry;
+        public MessageItem(Type type, String value) {
+            this.type = type;
+            this.value = value;
         }
     }
 
-    public String getDump() {
-        StringBuilder builder = new StringBuilder();
-        builder.append("    * * * * * * * * * * *    ");
-        builder.append("* * *  BUILD TELEMETRY  * * *");
-        builder.append("    * * * * * * * * * * *    ");
-        int index = 1;
+    private final List<MessageItem> itemList = new ArrayList<>();
 
-        for (Step step : stepList) {
-            String name = step.getName();
-            String purpose = step.getPurpose();
-            String dump = step.getDump();
-            builder.append(" ");
+    public Telemetry clear() {
+        itemList.clear();
+        return this;
+    }
 
-            if (isNullOrEmpty(purpose)) {
-                builder.append(String.format("[STEP %d]: %s", index, name));
-            } else {
-                builder.append(String.format("[STEP %d]: %s (%s)", index, name, purpose));
+    public Telemetry message(String format, Object... args) {
+        return addMessage(Type.MESSAGE, format, args);
+    }
+
+    public Telemetry warn(String format, Object... args) {
+        return addMessage(Type.WARNING, format, args);
+    }
+
+    public Telemetry error(String format, Object... args) {
+        return addMessage(Type.ERROR, format, args);
+    }
+
+    public Telemetry green(String format, Object... args) {
+        return addMessage(Type.GREEN, format, args);
+    }
+
+    private Telemetry addMessage(Type type, String format, Object... args) {
+        itemList.add(new MessageItem(type, String.format(format, args)));
+        return this;
+    }
+
+    public void populateToolWindow(TelemetryToolWindow window) {
+        for (MessageItem item : itemList) {
+            switch (item.type) {
+                case MESSAGE:
+                    window.message(item.value);
+                    break;
+                case WARNING:
+                    window.warn(item.value);
+                    break;
+                case ERROR:
+                    window.error(item.value);
+                    break;
+                case GREEN:
+                    window.green(item.value);
+                    break;
+                default:
+                    throw new RuntimeException("Unknown item type: " + item.type);
             }
-
-            builder.append(dump);
-            index++;
         }
-
-        builder.append(" ");
-        builder.append("* * * * * * * * * * * * * *");
-        return builder.toString();
     }
 }

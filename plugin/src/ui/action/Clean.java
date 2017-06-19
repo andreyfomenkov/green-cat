@@ -1,17 +1,27 @@
 package ui.action;
 
-import com.intellij.execution.ui.ConsoleView;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.wm.ToolWindow;
+import core.message.ProjectSetup;
+import core.task.TaskExecutor;
+import core.task.cleanup.CleanupTask;
 
 public class Clean extends ProjectAction {
-
-    private ToolWindow window;
-    private ConsoleView consoleView;
 
     @Override
     public void actionPerformed(AnActionEvent event) {
         Project project = getProject(event);
+        cleanBuildDirectory(project);
+    }
+
+    private void cleanBuildDirectory(Project project) {
+        String projectDir = project.getBasePath();
+        ProjectSetup message = new ProjectSetup("Setting up project base path");
+
+        TaskExecutor.Result result = TaskExecutor.create(message, getTelemetryLogger())
+                .add(new CleanupTask(projectDir))
+                .execute();
+
+        displayTaskExecutionResult(project, result);
     }
 }

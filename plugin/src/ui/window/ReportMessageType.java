@@ -2,10 +2,10 @@ package ui.window;
 
 public enum ReportMessageType {
 
-    REGULAR("#FFFFFF", false),
-    WARNING("#FFFF00", false),
-    ERROR("#FF0000", true),
-    GREEN("#00FF00", true);
+    REGULAR("#EEEEEE", false),
+    WARNING("#EEEE00", false),
+    ERROR("#EE0000", true),
+    GREEN("#00EE00", true);
 
     public final String color;
     public final boolean bold;
