@@ -5,6 +5,7 @@ import com.intellij.openapi.project.Project;
 import core.message.ProjectSetup;
 import core.task.TaskExecutor;
 import core.task.cleanup.CleanupTask;
+import core.task.diff.GitDiff;
 
 public class Clean extends ProjectAction {
 
@@ -20,6 +21,7 @@ public class Clean extends ProjectAction {
 
         TaskExecutor.Result result = TaskExecutor.create(message, getTelemetryLogger())
                 .add(new CleanupTask(projectDir))
+                .add(new GitDiff(projectDir))
                 .execute();
 
         displayTaskExecutionResult(project, result);

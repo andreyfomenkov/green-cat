@@ -14,10 +14,10 @@ import java.io.IOException;
 
 public class CleanupTask implements Task<ProjectSetup, CleanBuildMessage> {
 
-    private final String projectDir;
+    private final String projectPath;
 
-    public CleanupTask(String projectDir) {
-        this.projectDir = projectDir;
+    public CleanupTask(String projectPath) {
+        this.projectPath = projectPath;
     }
 
     @Override
@@ -28,9 +28,18 @@ public class CleanupTask implements Task<ProjectSetup, CleanBuildMessage> {
 
     @Override
     public CleanBuildMessage exec(Telemetry telemetry, ProjectSetup message) {
-        File buildDir = GreenCat.getBuildPath(projectDir);
+        File projectDir = new File(projectPath);
+        File buildDir = GreenCat.getBuildPath(projectPath);
         String description = null;
         boolean success = true;
+
+        if (projectDir.exists()) {
+            telemetry.message("Project base directory: %s", projectPath);
+        } else {
+            description = "Project base directory doesn't exist";
+            success = false;
+            telemetry.error(description);
+        }
 
         if (buildDir.exists()) {
             telemetry.message("Build directory found: %s", buildDir.getAbsolutePath());
