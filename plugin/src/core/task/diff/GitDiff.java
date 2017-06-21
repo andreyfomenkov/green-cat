@@ -3,8 +3,9 @@ package core.task.diff;
 import core.command.CommandExecutor;
 import core.command.CommandLineBuilder;
 import core.command.Parameter;
+import core.message.CleanBuildMessage;
 import core.message.GitDiffMessage;
-import core.message.Message;
+import core.task.ExecutionStatus;
 import core.task.Task;
 import core.task.TaskPurpose;
 import core.telemetry.Telemetry;
@@ -13,13 +14,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
-public class GitDiff implements Task<Message, GitDiffMessage> {
-
-    private final String projectPath;
-
-    public GitDiff(String projectPath) {
-        this.projectPath = projectPath;
-    }
+public class GitDiff implements Task<CleanBuildMessage, GitDiffMessage> {
 
     @Override
     public TaskPurpose getPurpose() {
@@ -27,7 +22,12 @@ public class GitDiff implements Task<Message, GitDiffMessage> {
     }
 
     @Override
-    public GitDiffMessage exec(Telemetry telemetry, Message message) {
+    public GitDiffMessage exec(Telemetry telemetry, CleanBuildMessage message) {
+        if (message.status != ExecutionStatus.SUCCESS) {
+            throw new IllegalArgumentException("Previous step execution failed");
+        }
+
+        String projectPath = message.getProjectPath();
 
         // git version => git version ...
         String cmd = CommandLineBuilder.create("git version").build();
@@ -38,12 +38,12 @@ public class GitDiff implements Task<Message, GitDiffMessage> {
             String line = output.get(0).trim();
 
             if (!line.startsWith("git version")) {
-                GitDiffMessage result = new GitDiffMessage(false, "Git is not installed on your system");
+                GitDiffMessage result = new GitDiffMessage(ExecutionStatus.ERROR, "Git is not installed on your system");
                 telemetry.error(result.description);
                 return result;
             }
         } else {
-            GitDiffMessage result = new GitDiffMessage(false, "Git is not installed on your system");
+            GitDiffMessage result = new GitDiffMessage(ExecutionStatus.ERROR, "Git is not installed on your system");
             telemetry.error(result.description);
             return result;
         }
@@ -60,12 +60,12 @@ public class GitDiff implements Task<Message, GitDiffMessage> {
             String line = output.get(0).trim();
 
             if (!line.startsWith("commit")) {
-                GitDiffMessage result = new GitDiffMessage(false, "Not a git repository");
+                GitDiffMessage result = new GitDiffMessage(ExecutionStatus.ERROR, "Not a git repository");
                 telemetry.error(result.description);
                 return result;
             }
         } else {
-            GitDiffMessage result = new GitDiffMessage(false, "Not a git repository");
+            GitDiffMessage result = new GitDiffMessage(ExecutionStatus.ERROR, "Not a git repository");
             telemetry.error(result.description);
             return result;
         }
@@ -159,7 +159,9 @@ public class GitDiff implements Task<Message, GitDiffMessage> {
             telemetry.warn("XML resources processing (layouts, strings, etc.) is planned for the upcoming versions");
         }
 
-        return new GitDiffMessage(true, null);
+        List<File> out = new ArrayList<>(modifiedFiles);
+        out.addAll(untrackedFiles);
+        return new GitDiffMessage(out);
     }
 
     public boolean isSupportedFileFormat(File file) {

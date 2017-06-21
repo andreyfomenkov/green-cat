@@ -14,14 +14,20 @@ public class TaskExecutor {
 
     public static class Result {
 
-        public final boolean success;
+        public final ExecutionStatus status;
         public final Task task;
         public final @Nullable String description;
+        public final long nanoTime;
 
-        public Result(Task task, @Nullable String description, boolean success) {
+        public Result(Task task, @Nullable String description, ExecutionStatus status) {
+            this(task, description, status, -1);
+        }
+
+        public Result(Task task, @Nullable String description, ExecutionStatus status, long nanoTime) {
             this.task = task;
             this.description = description;
-            this.success = success;
+            this.status = status;
+            this.nanoTime = nanoTime;
         }
     }
 
@@ -62,20 +68,25 @@ public class TaskExecutor {
                 telemetry.green("[STEP %d/%d] %s: %s", i + 1, size, purpose, purpose.value());
                 message = task.exec(telemetry, message);
 
-                if (!message.success) {
+                if (message.status == ExecutionStatus.ERROR) {
                     telemetry.error("");
                     telemetry.error("TASK EXECUTION FAILED");
-                    return new Result(task, message.description, false);
+                    return new Result(task, message.description, message.status);
+
+                } else if (message.status == ExecutionStatus.TERMINATED) {
+                    telemetry.warn("");
+                    telemetry.warn("TASK EXECUTION TERMINATED");
+                    return new Result(task, message.description, message.status);
                 }
             } catch (ClassCastException e) {
                 telemetry.error("");
                 telemetry.error("TASK EXECUTION FAILED: task message types mismatch");
-                return new Result(task, "task message types mismatch", false);
+                return new Result(task, "task message types mismatch", ExecutionStatus.ERROR);
 
             } catch (Exception e) {
                 telemetry.error("");
-                telemetry.error("TASK EXECUTION FAILED");
-                return new Result(task, String.format("error: %s", e.getLocalizedMessage()), false);
+                telemetry.error("TASK EXECUTION FAILED: %s", e.getLocalizedMessage());
+                return new Result(task, String.format("error: %s", e.getLocalizedMessage()), ExecutionStatus.ERROR);
             }
         }
 
@@ -83,6 +94,6 @@ public class TaskExecutor {
         String delay = Utils.formatNanoTimeToSeconds(endTime - startTime);
         telemetry.green("");
         telemetry.green("TASK(S) EXECUTION COMPLETE IN %s SEC", delay);
-        return new Result(taskList.get(size - 1), null, true);
+        return new Result(taskList.get(size - 1), null, ExecutionStatus.SUCCESS, endTime - startTime);
     }
 }

@@ -1,14 +1,15 @@
 package core.message;
 
 import com.sun.istack.internal.Nullable;
+import core.task.ExecutionStatus;
 
 public abstract class Message {
 
-    public final boolean success;
+    public final ExecutionStatus status;
     public final @Nullable String description;
 
-    protected Message(boolean success, @Nullable String description) {
-        this.success = success;
+    protected Message(ExecutionStatus status, @Nullable String description) {
+        this.status = status;
         this.description = description;
     }
 }

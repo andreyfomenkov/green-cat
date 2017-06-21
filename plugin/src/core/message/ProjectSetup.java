@@ -1,14 +1,17 @@
 package core.message;
 
-import com.sun.istack.internal.Nullable;
+import core.task.ExecutionStatus;
 
 public class ProjectSetup extends Message {
 
-    public ProjectSetup(@Nullable String description) {
-        this(true, description);
+    private final String projectPath;
+
+    public ProjectSetup(String projectPath) {
+        super(ExecutionStatus.SUCCESS, null);
+        this.projectPath = projectPath;
     }
 
-    protected ProjectSetup(boolean success, @Nullable String description) {
-        super(success, description);
+    public String getProjectPath() {
+        return projectPath;
     }
 }

@@ -6,6 +6,7 @@ import core.message.ProjectSetup;
 import core.task.TaskExecutor;
 import core.task.cleanup.CleanupTask;
 import core.task.diff.GitDiff;
+import core.task.javac.CompileWithJavac;
 
 public class Clean extends ProjectAction {
 
@@ -16,12 +17,13 @@ public class Clean extends ProjectAction {
     }
 
     private void cleanBuildDirectory(Project project) {
-        String projectDir = project.getBasePath();
-        ProjectSetup message = new ProjectSetup("Setting up project base path");
+        String projectPath = project.getBasePath();
+        ProjectSetup message = new ProjectSetup(projectPath);
 
         TaskExecutor.Result result = TaskExecutor.create(message, getTelemetryLogger())
-                .add(new CleanupTask(projectDir))
-                .add(new GitDiff(projectDir))
+                .add(new CleanupTask())
+                .add(new GitDiff())
+                .add(new CompileWithJavac(project))
                 .execute();
 
         displayTaskExecutionResult(project, result);

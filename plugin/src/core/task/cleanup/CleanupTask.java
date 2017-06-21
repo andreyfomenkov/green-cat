@@ -4,6 +4,7 @@ import com.sun.istack.internal.NotNull;
 import core.GreenCat;
 import core.message.CleanBuildMessage;
 import core.message.ProjectSetup;
+import core.task.ExecutionStatus;
 import core.task.Task;
 import core.task.TaskPurpose;
 import core.telemetry.Telemetry;
@@ -14,12 +15,6 @@ import java.io.IOException;
 
 public class CleanupTask implements Task<ProjectSetup, CleanBuildMessage> {
 
-    private final String projectPath;
-
-    public CleanupTask(String projectPath) {
-        this.projectPath = projectPath;
-    }
-
     @Override
     @NotNull
     public TaskPurpose getPurpose() {
@@ -28,17 +23,17 @@ public class CleanupTask implements Task<ProjectSetup, CleanBuildMessage> {
 
     @Override
     public CleanBuildMessage exec(Telemetry telemetry, ProjectSetup message) {
+        String projectPath = message.getProjectPath();
         File projectDir = new File(projectPath);
         File buildDir = GreenCat.getBuildPath(projectPath);
         String description = null;
-        boolean success = true;
 
         if (projectDir.exists()) {
             telemetry.message("Project base directory: %s", projectPath);
         } else {
             description = "Project base directory doesn't exist";
-            success = false;
             telemetry.error(description);
+            return new CleanBuildMessage(ExecutionStatus.ERROR, description, projectPath);
         }
 
         if (buildDir.exists()) {
@@ -47,15 +42,16 @@ public class CleanupTask implements Task<ProjectSetup, CleanBuildMessage> {
             try {
                 FileUtils.deleteDirectory(buildDir);
                 telemetry.message("Cleaning up build directory");
+
             } catch (IOException e) {
-                success = false;
-                description = e.getLocalizedMessage();
-                telemetry.error("Failed to remove build directory: %s", description);
+                description = String.format("Failed to remove build directory: %s", e.getLocalizedMessage());
+                telemetry.error(description);
+                return new CleanBuildMessage(ExecutionStatus.ERROR, description, projectPath);
             }
         } else {
             telemetry.message("No build directory found: %s", buildDir.getAbsolutePath());
         }
 
-        return new CleanBuildMessage(success, description);
+        return new CleanBuildMessage(ExecutionStatus.SUCCESS, description, projectPath);
     }
 }

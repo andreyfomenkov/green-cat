@@ -4,8 +4,10 @@ import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.actionSystem.PlatformDataKeys;
 import com.intellij.openapi.project.Project;
+import core.task.ExecutionStatus;
 import core.task.TaskExecutor;
 import core.telemetry.Telemetry;
+import core.util.Utils;
 import ui.util.EventLog;
 import ui.window.TelemetryToolWindow;
 
@@ -28,8 +30,11 @@ public abstract class ProjectAction extends AnAction {
         window.clear();
         telemetry.populateToolWindow(window);
 
-        if (result.success) {
-            EventLog.info("Task(s) execution complete");
+        if (result.status == ExecutionStatus.SUCCESS) {
+            String message = String.format("Task(s) execution complete in %s sec", Utils.formatNanoTimeToSeconds(result.nanoTime));
+            EventLog.info(message);
+        } else if (result.status == ExecutionStatus.TERMINATED) {
+            EventLog.warn("Task(s) execution terminated");
         } else {
             String taskName = result.task.getClass().getSimpleName();
             String message;

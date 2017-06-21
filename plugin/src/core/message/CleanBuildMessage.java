@@ -1,14 +1,18 @@
 package core.message;
 
 import com.sun.istack.internal.Nullable;
+import core.task.ExecutionStatus;
 
 public class CleanBuildMessage extends Message {
 
-    public CleanBuildMessage(String projectDir) {
-        super(true, null);
+    private final String projectPath;
+
+    public CleanBuildMessage(ExecutionStatus status, @Nullable String description, String projectPath) {
+        super(status, description);
+        this.projectPath = projectPath;
     }
 
-    public CleanBuildMessage(boolean success, @Nullable String description) {
-        super(success, description);
+    public String getProjectPath() {
+        return projectPath;
     }
 }
