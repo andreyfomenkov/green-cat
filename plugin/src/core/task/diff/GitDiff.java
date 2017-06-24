@@ -1,5 +1,6 @@
 package core.task.diff;
 
+import com.google.common.collect.ImmutableList;
 import core.command.CommandExecutor;
 import core.command.CommandLineBuilder;
 import core.command.Parameter;
@@ -115,9 +116,7 @@ public class GitDiff implements Task<CleanBuildMessage, GitDiffMessage> {
 
         boolean hasUnsupportedFiles = false;
 
-        if (modifiedFiles.size() == 0 && untrackedFiles.size() == 0) {
-            telemetry.message("No source changes found");
-        } else {
+        if (!modifiedFiles.isEmpty() || !untrackedFiles.isEmpty()) {
             if (modifiedFiles.size() > 0) {
                 telemetry.message("");
                 telemetry.message("Modified files:");
@@ -159,12 +158,31 @@ public class GitDiff implements Task<CleanBuildMessage, GitDiffMessage> {
             telemetry.warn("XML resources processing (layouts, strings, etc.) is planned for the upcoming versions");
         }
 
-        List<File> out = new ArrayList<>(modifiedFiles);
-        out.addAll(untrackedFiles);
-        return new GitDiffMessage(out);
+        List<File> allFileList = new ArrayList<>(modifiedFiles);
+        allFileList.addAll(untrackedFiles);
+        List<File> sourceFileList = filterSupportedFiles(allFileList);
+
+        if (sourceFileList.isEmpty()) {
+            telemetry.message("");
+            telemetry.message("No source changes to compile");
+        }
+
+        return new GitDiffMessage(sourceFileList);
     }
 
-    public boolean isSupportedFileFormat(File file) {
+    private List<File> filterSupportedFiles(List<File> in) {
+        List<File> files = new ArrayList<>();
+
+        for (File file : in) {
+            if (isSupportedFileFormat(file)) {
+                files.add(file);
+            }
+        }
+
+        return ImmutableList.copyOf(files);
+    }
+
+    private boolean isSupportedFileFormat(File file) {
         String path = file.getAbsolutePath();
         return path.endsWith(".java");
     }
