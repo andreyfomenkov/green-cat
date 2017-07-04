@@ -37,6 +37,6 @@ public class RestartAppTask implements Task<DeployMessage, RestartAppMessage> {
         String cmdStart = String.format("%s shell am start -n \"%s/%s\" -a %s -c %s", adbFilePath, appPackage, mainActivity, action, category);
         CommandExecutor.exec(cmdForceStop);
         CommandExecutor.exec(cmdStart);
-        return null;
+        return new RestartAppMessage();
     }
 }
