@@ -1,38 +1,30 @@
 package core.task.javac;
 
-import com.intellij.openapi.module.Module;
-import com.intellij.openapi.module.ModuleManager;
-import com.intellij.openapi.project.Project;
-import com.intellij.openapi.roots.OrderEnumerator;
-import com.intellij.openapi.vfs.VirtualFile;
-import core.GreenCat;
+import com.intellij.ide.macro.ClasspathMacro;
+import com.intellij.openapi.actionSystem.DataContext;
 import core.command.CommandExecutor;
 import core.command.CommandLineBuilder;
 import core.command.Parameter;
+import core.exception.ClasspathException;
 import core.message.CompileWithJavacMessage;
 import core.message.GitDiffMessage;
 import core.task.ExecutionStatus;
 import core.task.Task;
 import core.task.TaskPurpose;
 import core.telemetry.Telemetry;
-import org.apache.commons.io.FileUtils;
 
 import java.io.File;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
-import static com.intellij.openapi.compiler.CompilerPaths.getModuleOutputPath;
+import static ui.util.Utils.isNullOrEmpty;
 
 public class CompileWithJavac implements Task<GitDiffMessage, CompileWithJavacMessage> {
 
-    private final Project project;
+    private final DataContext context;
     private final File objDir;
 
-    public CompileWithJavac(Project project, File objDir) {
-        this.project = project;
+    public CompileWithJavac(DataContext context, File objDir) {
+        this.context = context;
         this.objDir = objDir;
     }
 
@@ -49,58 +41,45 @@ public class CompileWithJavac implements Task<GitDiffMessage, CompileWithJavacMe
             throw new IllegalArgumentException("No files to compile from the previous step");
         }
 
-        ModuleManager manager = ModuleManager.getInstance(project);
-        Module[] modules = manager.getModules();
-        Set<File> projectClasspath = new HashSet<>();
-        telemetry.message("Project modules:");
+        telemetry.message("Compiling with javac...");
+        String classpath;
 
-        for (Module module : modules) {
-            List<File> moduleClasspath = getModuleClasspath(module, false);
-            projectClasspath.addAll(moduleClasspath);
-            telemetry.message("- %s: %d classpath items", module.getName(), moduleClasspath.size());
+        try {
+            classpath = composeClasspathArgument(context);
+        } catch (ClasspathException e) {
+            return new CompileWithJavacMessage(ExecutionStatus.ERROR, "Classpath is empty");
         }
 
-        telemetry.message("Total project classpath: %d items", projectClasspath.size());
-        telemetry.message("");
-        telemetry.message("Compiling with javac...");
-
-        if (compileWithJavac(telemetry, message.getFileList(), new ArrayList<>(projectClasspath))) {
+        if (compileWithJavac(telemetry, message.getFileList(), classpath)) {
             return new CompileWithJavacMessage(ExecutionStatus.SUCCESS, null);
         } else {
             return new CompileWithJavacMessage(ExecutionStatus.ERROR, "Compilation errors");
         }
     }
 
-    private List<File> getModuleClasspath(Module module, boolean forTestClasses) {
-        List<File> fileList = new ArrayList<>();
-        Set<String> pathSet = new HashSet<>();
+    private String composeClasspathArgument(DataContext context) throws ClasspathException {
+        ClasspathMacro macro = new ClasspathMacro();
+        String value = macro.expand(context);
 
-        String moduleOutputPath = getModuleOutputPath(module, forTestClasses);
-        VirtualFile[] virtualFiles = OrderEnumerator.orderEntries(module).recursively().getClassesRoots();
-        pathSet.add(moduleOutputPath);
+        if (isNullOrEmpty(value)) {
+            throw new ClasspathException("Classpath is empty");
+        }
 
-        for(VirtualFile virtualFile : virtualFiles) {
-            String path = virtualFile.getPath();
+        StringBuilder builder = new StringBuilder();
 
-            if (path.endsWith("!/")) {
-                path = path.substring(0, path.length() - 2);
-            } else if (path.endsWith("!")) {
-                path = path.substring(0, path.length() - 1);
-            }
+        for (String path : value.split(":")) {
+            File file = new File(path);
 
-            if (pathSet.add(path)) {
-                File file = new File(path);
-
-                if (file.exists()) {
-                    fileList.add(file);
-                }
+            if (file.exists()) {
+                path = path.replace(" ", "%20");
+                builder.append(builder.length() == 0 ? "" : ":").append(path);
             }
         }
 
-        return fileList;
+        return builder.toString();
     }
 
-    private boolean compileWithJavac(Telemetry telemetry, List<File> javaFiles, List<File> classpath) {
+    private boolean compileWithJavac(Telemetry telemetry, List<File> javaFiles, String classpath) {
         String cmd = CommandLineBuilder.create("which javac").build();
         List<String> output = CommandExecutor.exec(cmd);
 
@@ -115,37 +94,14 @@ public class CompileWithJavac implements Task<GitDiffMessage, CompileWithJavacMe
         }
 
         StringBuilder srcBuilder = new StringBuilder();
-        StringBuilder cpBuilder = new StringBuilder();
-        List<String> cpPaths = new ArrayList<>();
 
         for (File file : javaFiles) {
             String path = file.getAbsolutePath();
             srcBuilder.append(path).append(" ");
         }
 
-        for (int i = 0; i < classpath.size(); i++) {
-            String path = classpath.get(i).getAbsolutePath();
-
-            if (path.contains(" ")) { // FIXME
-                continue;
-            }
-
-            cpPaths.add(path);
-            cpBuilder.append(i > 0 ? File.pathSeparator : "").append(path);
-        }
-
-        String projectPath = project.getBasePath();
-        File dumpFile = GreenCat.getClasspathDumpFilePath(projectPath);
-        telemetry.message("Dumping project classpath...");
-
-        if (dumpProjectClasspath(dumpFile, cpPaths)) {
-            telemetry.message("See project classpath in %s", dumpFile.getAbsolutePath());
-        } else {
-            telemetry.warn("Failed to write project classpath into %s", dumpFile.getAbsolutePath());
-        }
-
         cmd = CommandLineBuilder.create("javac")
-                .add(new Parameter("-cp", cpBuilder.toString()))
+                .add(new Parameter("-cp", classpath))
                 .add(new Parameter("-d", objDir.getAbsolutePath()))
                 .add(new Parameter(srcBuilder.toString()))
                 .build();
@@ -154,7 +110,7 @@ public class CompileWithJavac implements Task<GitDiffMessage, CompileWithJavacMe
         boolean compilationSuccess = true;
 
         for (String line : output) {
-            if (line.contains("error: ")) {
+            if (line.contains("error: ") || line.contains("invalid flag:")) {
                 compilationSuccess = false;
                 break;
             }
@@ -173,21 +129,5 @@ public class CompileWithJavac implements Task<GitDiffMessage, CompileWithJavacMe
         telemetry.message("");
         telemetry.message("Compilation %s", compilationSuccess ? "success" : "failed");
         return compilationSuccess;
-    }
-
-    private boolean dumpProjectClasspath(File dumpFile, List<String> classpath) {
-        if (dumpFile.exists()) {
-            if (!dumpFile.delete()) {
-                return false;
-            }
-        }
-
-        try {
-            FileUtils.writeLines(dumpFile, classpath);
-        } catch (IOException ignore) {
-            return false;
-        }
-
-        return true;
     }
 }

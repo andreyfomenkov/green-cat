@@ -1,6 +1,7 @@
 package ui.action;
 
 import com.intellij.openapi.actionSystem.AnActionEvent;
+import com.intellij.openapi.actionSystem.DataContext;
 import com.intellij.openapi.project.Project;
 import core.GreenCat;
 import core.message.ProjectSetup;
@@ -16,10 +17,11 @@ public class Clean extends ProjectAction {
     @Override
     public void actionPerformed(AnActionEvent event) {
         Project project = getProject(event);
-        cleanBuildDirectory(project);
+        DataContext context = event.getDataContext();
+        cleanBuildDirectory(project, context);
     }
 
-    private void cleanBuildDirectory(Project project) {
+    private void cleanBuildDirectory(Project project, DataContext context) {
         String projectPath = project.getBasePath();
         File objPath = GreenCat.getObjPath(projectPath);
         ProjectSetup message = new ProjectSetup(projectPath);
@@ -27,7 +29,7 @@ public class Clean extends ProjectAction {
         TaskExecutor.Result result = TaskExecutor.create(message, getTelemetryLogger())
                 .add(new CleanupTask())
                 .add(new GitDiff())
-                .add(new CompileWithJavac(project, objPath))
+                .add(new CompileWithJavac(context, objPath))
                 .execute();
 
         displayTaskExecutionResult(project, result);
