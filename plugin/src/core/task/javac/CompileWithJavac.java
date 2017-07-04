@@ -2,6 +2,7 @@ package core.task.javac;
 
 import com.intellij.ide.macro.ClasspathMacro;
 import com.intellij.openapi.actionSystem.DataContext;
+import com.intellij.openapi.util.io.FileUtil;
 import core.command.CommandExecutor;
 import core.command.CommandLineBuilder;
 import core.command.Parameter;
@@ -53,7 +54,7 @@ public class CompileWithJavac implements Task<GitDiffMessage, CompileWithJavacMe
         }
 
         if (compileWithJavac(telemetry, message.getFileList(), classpath)) {
-            return new CompileWithJavacMessage(ExecutionStatus.SUCCESS, null);
+            return new CompileWithJavacMessage(classpath);
         } else {
             return new CompileWithJavacMessage(ExecutionStatus.ERROR, "Compilation errors");
         }
@@ -73,14 +74,11 @@ public class CompileWithJavac implements Task<GitDiffMessage, CompileWithJavacMe
         builder.append(projectPath).append("/presentation/app/build/intermediates/classes/googlePlayStoreAgoda/debug");
 
         for (String path : value.split(":")) {
-            File file = new File(path);
-
-            if (file.exists()) {
+            if (FileUtil.exists(path)) {
                 path = path.replace(" ", "%20");
                 builder.append(builder.length() == 0 ? "" : ":").append(path);
             }
         }
-
         return builder.toString();
     }
 
