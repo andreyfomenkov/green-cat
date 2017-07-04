@@ -30,10 +30,13 @@ public class RestartAppTask implements Task<DeployMessage, RestartAppMessage> {
         telemetry.message("Application launcher activity: %s", mainActivity);
         telemetry.message("Restarting...");
 
-        String cmdForceStop = String.format("adb shell am force-stop %s", appPackage);
-        String cmdStart = String.format("adb shell am start -n \"%s/%s\" -a android.intent.action.MAIN -c android.intent.category.LAUNCHER", appPackage, mainActivity);
+        String adbFilePath = androidSdkPath + "/platform-tools/adb";
+        String action = "android.intent.action.MAIN";
+        String category = "android.intent.category.LAUNCHER";
+        String cmdForceStop = String.format("%s shell am force-stop %s", adbFilePath, appPackage);
+        String cmdStart = String.format("%s shell am start -n \"%s/%s\" -a %s -c %s", adbFilePath, appPackage, mainActivity, action, category);
         CommandExecutor.exec(cmdForceStop);
         CommandExecutor.exec(cmdStart);
-        return null;
+        return new RestartAppMessage();
     }
 }
