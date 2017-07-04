@@ -51,7 +51,7 @@ public class CompileWithJavac implements Task<GitDiffMessage, CompileWithJavacMe
         }
 
         if (compileWithJavac(telemetry, message.getFileList(), classpath)) {
-            return new CompileWithJavacMessage(ExecutionStatus.SUCCESS, null);
+            return new CompileWithJavacMessage(classpath);
         } else {
             return new CompileWithJavacMessage(ExecutionStatus.ERROR, "Compilation errors");
         }

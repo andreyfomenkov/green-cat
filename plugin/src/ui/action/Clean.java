@@ -9,6 +9,7 @@ import core.task.TaskExecutor;
 import core.task.cleanup.CleanupTask;
 import core.task.diff.GitDiff;
 import core.task.javac.CompileWithJavac;
+import core.task.retrolambda.RetrolambdaTask;
 
 import java.io.File;
 
@@ -23,13 +24,14 @@ public class Clean extends ProjectAction {
 
     private void cleanBuildDirectory(Project project, DataContext context) {
         String projectPath = project.getBasePath();
-        File objPath = GreenCat.getObjPath(projectPath);
+        File objDir = GreenCat.getObjPath(projectPath);
         ProjectSetup message = new ProjectSetup(projectPath);
 
         TaskExecutor.Result result = TaskExecutor.create(message, getTelemetryLogger())
                 .add(new CleanupTask())
                 .add(new GitDiff())
-                .add(new CompileWithJavac(context, objPath))
+                .add(new CompileWithJavac(context, objDir))
+                .add(new RetrolambdaTask(objDir.getAbsolutePath()))
                 .execute();
 
         displayTaskExecutionResult(project, result);
