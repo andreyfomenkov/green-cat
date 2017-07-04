@@ -29,7 +29,7 @@ public class Clean extends ProjectAction {
         TaskExecutor.Result result = TaskExecutor.create(message, getTelemetryLogger())
                 .add(new CleanupTask())
                 .add(new GitDiff())
-                .add(new CompileWithJavac(context, objPath))
+                .add(new CompileWithJavac(context, projectPath, objPath))
                 .execute();
 
         displayTaskExecutionResult(project, result);

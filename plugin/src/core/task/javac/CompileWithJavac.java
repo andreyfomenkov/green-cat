@@ -21,10 +21,12 @@ import static ui.util.Utils.isNullOrEmpty;
 public class CompileWithJavac implements Task<GitDiffMessage, CompileWithJavacMessage> {
 
     private final DataContext context;
+    private final String projectPath;
     private final File objDir;
 
-    public CompileWithJavac(DataContext context, File objDir) {
+    public CompileWithJavac(DataContext context, String projectPath, File objDir) {
         this.context = context;
+        this.projectPath = projectPath;
         this.objDir = objDir;
     }
 
@@ -66,6 +68,9 @@ public class CompileWithJavac implements Task<GitDiffMessage, CompileWithJavacMe
         }
 
         StringBuilder builder = new StringBuilder();
+
+        // Agoda specific path
+        builder.append(projectPath).append("/presentation/app/build/intermediates/classes/googlePlayStoreAgoda/debug");
 
         for (String path : value.split(":")) {
             File file = new File(path);
