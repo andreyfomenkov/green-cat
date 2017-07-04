@@ -25,7 +25,7 @@ public class CleanupTask implements Task<ProjectSetup, CleanBuildMessage> {
     public CleanBuildMessage exec(Telemetry telemetry, ProjectSetup message) {
         String projectPath = message.getProjectPath();
         File projectDir = new File(projectPath);
-        File buildDir = GreenCat.getBuildPath(projectPath);
+        File buildDir = GreenCat.getBuildDir(projectPath);
         String description = null;
 
         if (projectDir.exists()) {

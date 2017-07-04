@@ -8,7 +8,7 @@ public enum TaskPurpose {
     PROCESS_WITH_RETROLAMBDA("Processing with Retrolambda"),
     PROCESS_WITH_DESUGAR("Processing with Desugar"),
     MAKE_DEX("Dexing"),
-    PUSH_DEX_TO_DEVICE("Pushing to device"),
+    DEPLOY_ON_DEVICE("Deploying changes on Android device"),
     RESTART_APPLICATION("Restarting application");
 
     private final String purpose;
