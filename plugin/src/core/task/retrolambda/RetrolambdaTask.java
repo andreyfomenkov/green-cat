@@ -71,6 +71,7 @@ public class RetrolambdaTask implements Task<CompileWithJavacMessage, ClassDesug
         String cmd = CommandLineBuilder.create("java")
                 .add(new Parameter("-Dretrolambda.inputDir=" + objPath))
                 .add(new Parameter("-Dretrolambda.classpath=" + classpath))
+                .add(new Parameter("-Dretrolambda.bytecodeVersion=50"))
                 .add(new Parameter("-jar", jarFilePath))
                 .build();
         List<String> output = CommandExecutor.exec(cmd);

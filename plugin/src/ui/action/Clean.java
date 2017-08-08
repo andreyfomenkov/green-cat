@@ -41,7 +41,6 @@ public class Clean extends ProjectAction {
                 .add(new RetrolambdaTask(objDir.getAbsolutePath()))
                 .add(new DexTask(androidSdkPath, objDir, dexDir))
                 .add(new DeployTask(androidSdkPath, deployPath, "delta.dex"))
-                // Agoda specific settings
                 .add(new RestartAppTask(androidSdkPath, "com.agoda.mobile.consumer.debug", "com.agoda.mobile.consumer.screens.splash.AppLauncherActivity"))
                 .execute();
 

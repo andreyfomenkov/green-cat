@@ -71,7 +71,8 @@ public class CompileWithJavac implements Task<GitDiffMessage, CompileWithJavacMe
         StringBuilder builder = new StringBuilder();
 
         // Agoda specific path
-        builder.append(projectPath).append("/presentation/app/build/intermediates/classes/googlePlayStoreAgoda/debug");
+        builder.append(projectPath)
+                .append("/presentation/app/build/intermediates/classes/googlePlayStoreAgoda/debug");
 
         for (String path : value.split(":")) {
             if (FileUtil.exists(path)) {
@@ -104,8 +105,12 @@ public class CompileWithJavac implements Task<GitDiffMessage, CompileWithJavacMe
         }
 
         cmd = CommandLineBuilder.create("javac")
-                .add(new Parameter("-cp", classpath))
                 .add(new Parameter("-d", objDir.getAbsolutePath()))
+                .add(new Parameter("-source 1.8"))
+                .add(new Parameter("-target 1.8"))
+                .add(new Parameter("-encoding UTF-8"))
+                .add(new Parameter("-g"))
+                .add(new Parameter("-cp", classpath))
                 .add(new Parameter(srcBuilder.toString()))
                 .build();
 
