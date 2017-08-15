@@ -2,8 +2,9 @@ package ru.fomenkov.input;
 
 public enum Argument {
 
-    PROJECT_DIR("-projectdir"),
-    CLASSPATH("-classpath");
+    PROJECT_PATH("-d"),
+    CLASSPATH("-cp"),
+    ANDROID_SDK_PATH("-sdk");
 
     private final String value;
 

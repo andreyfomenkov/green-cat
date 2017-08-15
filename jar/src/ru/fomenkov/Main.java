@@ -1,8 +1,8 @@
 package ru.fomenkov;
 
+import ru.fomenkov.exception.MissingArgumentsException;
 import ru.fomenkov.input.LibraryInput;
 import ru.fomenkov.input.LibraryInputReader;
-import ru.fomenkov.exception.MissingArgumentsException;
 import ru.fomenkov.util.Log;
 
 public class Main {
@@ -17,7 +17,5 @@ public class Main {
         } catch (MissingArgumentsException ignore) {
             return;
         }
-
-        input.setClasspath("sadasd");
     }
 }

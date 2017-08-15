@@ -13,8 +13,9 @@ public class LibraryInputReader {
 
     public LibraryInputReader(String[] args) {
         this.args = args;
-        requiredArguments.add(Argument.PROJECT_DIR);
+        requiredArguments.add(Argument.PROJECT_PATH);
         requiredArguments.add(Argument.CLASSPATH);
+        requiredArguments.add(Argument.ANDROID_SDK_PATH);
     }
 
     public LibraryInput read() throws MissingArgumentsException {
@@ -22,22 +23,28 @@ public class LibraryInputReader {
         Argument nextArg = null;
 
         for (String arg : args) {
-            if (Argument.PROJECT_DIR.value().equals(arg)) {
-                nextArg = Argument.PROJECT_DIR;
+            if (Argument.PROJECT_PATH.value().equals(arg)) {
+                nextArg = Argument.PROJECT_PATH;
+
             } else if (Argument.CLASSPATH.value().equals(arg)) {
                 nextArg = Argument.CLASSPATH;
+
+            } else if (Argument.ANDROID_SDK_PATH.value().equals(arg)) {
+                nextArg = Argument.ANDROID_SDK_PATH;
             } else {
                 if (nextArg == null) {
                     Log.e("Invalid argument found: %s", arg);
                     throw new MissingArgumentsException("Invalid argument");
                 } else {
                     switch (nextArg) {
-                        case PROJECT_DIR:
-                            input.setProjectDir(arg);
+                        case PROJECT_PATH:
+                            input.setProjectPath(arg);
                             break;
                         case CLASSPATH:
                             input.setClasspath(arg);
                             break;
+                        case ANDROID_SDK_PATH:
+                            input.setAndroidSdkPath(arg);
                     }
                     nextArg = null;
                 }

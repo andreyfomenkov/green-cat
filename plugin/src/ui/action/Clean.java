@@ -2,17 +2,15 @@ package ui.action;
 
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.actionSystem.DataContext;
-import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
-import com.intellij.ui.AppUIUtil;
 import core.GreenCat;
-import core.message.ProjectSetup;
-import core.task.TaskExecutor;
-import core.task.cleanup.CleanupTask;
-import core.task.dex.DexTask;
-import core.task.diff.GitDiff;
-import core.task.javac.CompileWithJavac;
-import core.task.retrolambda.RetrolambdaTask;
+import ru.fomenkov.message.ProjectSetup;
+import ru.fomenkov.task.TaskExecutor;
+import ru.fomenkov.task.cleanup.CleanupTask;
+import ru.fomenkov.task.dex.DexTask;
+import ru.fomenkov.task.diff.GitDiff;
+import ru.fomenkov.task.javac.CompileWithJavac;
+import ru.fomenkov.task.retrolambda.RetrolambdaTask;
 import core.util.Utils;
 
 import java.io.File;

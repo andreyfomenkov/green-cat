@@ -2,15 +2,24 @@ package ru.fomenkov.input;
 
 public class LibraryInput {
 
-    private String projectDir;
+    private String projectPath;
     private String classpath;
+    private String androidSdkPath;
 
-    public String getProjectDir() {
-        return projectDir;
+    public String getAndroidSdkPath() {
+        return androidSdkPath;
     }
 
-    public void setProjectDir(String projectDir) {
-        this.projectDir = projectDir;
+    public void setAndroidSdkPath(String androidSdkPath) {
+        this.androidSdkPath = androidSdkPath;
+    }
+
+    public String getProjectPath() {
+        return projectPath;
+    }
+
+    public void setProjectPath(String projectPath) {
+        this.projectPath = projectPath;
     }
 
     public String getClasspath() {
@@ -23,6 +32,6 @@ public class LibraryInput {
 
     @Override
     public String toString() {
-        return String.format("PROJECT DIR: %s, CLASSPATH: %s", projectDir, classpath);
+        return String.format("PROJECT PATH: %s, ANDROID SDK PATH: %s, CLASSPATH: %s", projectPath, androidSdkPath, classpath);
     }
 }
