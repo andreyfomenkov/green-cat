@@ -105,7 +105,7 @@ public class CompileWithJavac implements Task<GitDiffMessage, CompileWithJavacMe
         boolean compilationSuccess = true;
 
         for (String line : output) {
-            if (line.contains("error: ") || line.contains("invalid flag:")) {
+            if (line.contains("error: ") || line.contains("invalid flag:") || line.contains("Usage: javac")) {
                 compilationSuccess = false;
                 break;
             }

@@ -1,5 +1,7 @@
 package ru.fomenkov.telemetry;
 
+import ru.fomenkov.util.Log;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -51,24 +53,9 @@ public class Telemetry {
         return this;
     }
 
-//    public void populateToolWindow(TelemetryToolWindow window) {
-//        for (MessageItem item : itemList) {
-//            switch (item.type) {
-//                case MESSAGE:
-//                    window.message(item.value);
-//                    break;
-//                case WARNING:
-//                    window.warn(item.value);
-//                    break;
-//                case ERROR:
-//                    window.error(item.value);
-//                    break;
-//                case GREEN:
-//                    window.green(item.value);
-//                    break;
-//                default:
-//                    throw new RuntimeException("Unknown item type: " + item.type);
-//            }
-//        }
-//    }
+    public void printOutput() {
+        for (MessageItem item : itemList) {
+            Log.d(item.value);
+        }
+    }
 }
