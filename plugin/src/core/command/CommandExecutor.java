@@ -31,4 +31,13 @@ public class CommandExecutor {
         }
         return lines;
     }
+
+    public static void execNoOutput(String cmd) {
+        try {
+            Process process = Runtime.getRuntime().exec(cmd);
+            process.waitFor();
+        } catch (IOException | InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
 }

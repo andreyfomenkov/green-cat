@@ -18,12 +18,12 @@ import java.util.List;
 public class DexTask implements Task<ClassDesugarMessage, DexMessage> {
 
     private final String androidSdkPath;
-    private final File objDir;
+    private final File lambdaDir;
     private final File dexDir;
 
-    public DexTask(String androidSdkPath, File objDir, File dexDir) {
+    public DexTask(String androidSdkPath, File lambdaDir, File dexDir) {
         this.androidSdkPath = androidSdkPath;
-        this.objDir = objDir;
+        this.lambdaDir = lambdaDir;
         this.dexDir = dexDir;
     }
 
@@ -80,7 +80,7 @@ public class DexTask implements Task<ClassDesugarMessage, DexMessage> {
 
             telemetry.message("DEX file directory: %s", dexDir.getAbsolutePath());
 
-            if (makeDex(telemetry, dxToolPath, objDir.getAbsolutePath(), dexDir.getAbsolutePath())) {
+            if (makeDex(telemetry, dxToolPath, lambdaDir.getAbsolutePath(), dexDir.getAbsolutePath())) {
                 telemetry.message("DEX file created");
                 return new DexMessage(dexDir + "/classes.dex");
             } else {
@@ -93,17 +93,21 @@ public class DexTask implements Task<ClassDesugarMessage, DexMessage> {
         }
     }
 
-    private boolean makeDex(Telemetry telemetry, String dxToolPath, String objPath, String dexPath) {
+    private boolean makeDex(Telemetry telemetry, String dxToolPath, String lambdaPath, String dexPath) {
         String cmd = CommandLineBuilder.create(dxToolPath + "/dx")
                 .add(new Parameter("--dex"))
-                .add(new Parameter("--output", dexPath))
-                .add(new Parameter(objPath))
+                .add(new Parameter("--multi-dex"))
+                .add(new Parameter("--output=" + dexPath))
+                .add(new Parameter(lambdaPath + "/"))
                 .build();
-        List<String> output = CommandExecutor.exec(cmd);
 
-        for (String line : output) {
-            telemetry.message(line);
-        }
+        telemetry.message("Command: %s", cmd);
+        CommandExecutor.execNoOutput(cmd);
+//        List<String> output = CommandExecutor.exec(cmd);
+//
+//        for (String line : output) {
+//            telemetry.message(line);
+//        }
         return true;
     }
 }

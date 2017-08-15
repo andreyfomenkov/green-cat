@@ -23,10 +23,12 @@ public class RetrolambdaTask implements Task<CompileWithJavacMessage, ClassDesug
     private static final String GRADLE_GENERIC_DIR = "/.gradle/";
     private static final String RETROLAMBDA_FILE_PATTERN = "retrolambda*.jar";
     private static final String[] JAR_FILE_LOOKUP_ORDER = {GRADLE_CACHES_MODULES_DIR, GRADLE_CACHES_DIR, GRADLE_GENERIC_DIR};
-    private final String objPath;
+    private final String compilePath;
+    private final String lambdaPath;
 
-    public RetrolambdaTask(String objPath) {
-        this.objPath = objPath;
+    public RetrolambdaTask(String compilePath, String lambdaPath) {
+        this.compilePath = compilePath;
+        this.lambdaPath = lambdaPath;
     }
 
     @Override
@@ -44,7 +46,7 @@ public class RetrolambdaTask implements Task<CompileWithJavacMessage, ClassDesug
             telemetry.message("JAR file: %s", jarPath);
         }
 
-        if (processClassFiles(telemetry, jarPath, objPath, message.classpath)) {
+        if (processClassFiles(telemetry, jarPath, compilePath, lambdaPath, message.classpath)) {
             return new ClassDesugarMessage(ExecutionStatus.SUCCESS, null);
         } else {
             return new ClassDesugarMessage(ExecutionStatus.ERROR, "Failed to process class files with Retrolambda");
@@ -67,25 +69,21 @@ public class RetrolambdaTask implements Task<CompileWithJavacMessage, ClassDesug
         return null;
     }
 
-    private boolean processClassFiles(Telemetry telemetry, String jarFilePath, String objPath, String classpath) {
+    private boolean processClassFiles(Telemetry telemetry, String jarFilePath, String compilePath, String lambdaPath, String classpath) {
         String cmd = CommandLineBuilder.create("java")
-                .add(new Parameter("-Dretrolambda.inputDir=" + objPath))
-                .add(new Parameter("-Dretrolambda.classpath=" + classpath))
                 .add(new Parameter("-Dretrolambda.bytecodeVersion=50"))
+                .add(new Parameter("-Dretrolambda.inputDir=" + compilePath))
+                .add(new Parameter("-Dretrolambda.outputDir=" + lambdaPath))
+                .add(new Parameter("-Dretrolambda.classpath=" + compilePath + ":" + classpath))
+                .add(new Parameter("-Dfile.encoding=UTF-8"))
+                .add(new Parameter("-Duser.country=US"))
+                .add(new Parameter("-Duser.language=en"))
+                .add(new Parameter("-Duser.variant"))
                 .add(new Parameter("-jar", jarFilePath))
                 .build();
-        List<String> output = CommandExecutor.exec(cmd);
-        boolean success = false;
 
-        for (String line : output) {
-            line = line.replace("%20", " ");
-            telemetry.message(line);
-
-            if (!success && line.contains("Saving lambda class:")) {
-                success = true;
-            }
-        }
-
-        return success;
+        telemetry.green("CMD: %s", cmd);
+        CommandExecutor.execNoOutput(cmd);
+        return true;
     }
 }

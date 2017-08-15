@@ -44,6 +44,13 @@ public class CompileWithJavac implements Task<GitDiffMessage, CompileWithJavacMe
             throw new IllegalArgumentException("No files to compile from the previous step");
         }
 
+        telemetry.message("Copying project .class files...");
+
+        if (copyClassFiles(telemetry)) {
+        } else {
+            return new CompileWithJavacMessage(ExecutionStatus.ERROR, "Failed to copy project .class files");
+        }
+
         telemetry.message("Compiling with javac...");
         String classpath;
 
@@ -58,6 +65,26 @@ public class CompileWithJavac implements Task<GitDiffMessage, CompileWithJavacMe
         } else {
             return new CompileWithJavacMessage(ExecutionStatus.ERROR, "Compilation errors");
         }
+    }
+
+    private boolean copyClassFiles(Telemetry telemetry) {
+        if (!objDir.exists() && !objDir.mkdirs()) {
+            telemetry.error("Failed to create directory for classes: %s", objDir.getPath());
+            return false;
+        }
+
+        String cmd = CommandLineBuilder.create("cp -r")
+                .add(new Parameter("/home/afomenkov/workspace/client-android/presentation/app/build/intermediates/classes/googlePlayStoreAgoda/debug/."))
+                .add(new Parameter("/home/afomenkov/workspace/client-android/build/greencat/compile"))
+                .build();
+
+        telemetry.message("Command: %s", cmd);
+
+        List<String> output = CommandExecutor.exec(cmd);
+        for (String line : output) {
+            telemetry.message(line);
+        }
+        return true;
     }
 
     private String composeClasspathArgument(DataContext context) throws ClasspathException {
@@ -89,11 +116,6 @@ public class CompileWithJavac implements Task<GitDiffMessage, CompileWithJavacMe
 
         if (output.isEmpty()) {
             telemetry.error("Can't find java compiler");
-            return false;
-        }
-
-        if (!objDir.exists() && !objDir.mkdirs()) {
-            telemetry.error("Failed to create directory for classes: %s", objDir.getPath());
             return false;
         }
 

@@ -4,6 +4,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.wm.ToolWindow;
 import com.intellij.openapi.wm.ToolWindowAnchor;
 import com.intellij.openapi.wm.ToolWindowManager;
+import com.intellij.ui.components.JBScrollPane;
 
 import javax.swing.*;
 
@@ -22,7 +23,7 @@ public class TelemetryToolWindow {
         if (window == null) {
             textPane = new JTextPane();
             textPane.setEditable(false);
-            JScrollPane scrollPane = new JScrollPane(textPane);
+            JBScrollPane scrollPane = new JBScrollPane(textPane);
 
             textPane.setContentType("text/html");
             initHtmlComposer();
