@@ -9,6 +9,7 @@ import ru.fomenkov.task.ExecutionStatus;
 import ru.fomenkov.task.Task;
 import ru.fomenkov.task.TaskPurpose;
 import ru.fomenkov.telemetry.Telemetry;
+import ru.fomenkov.util.Log;
 
 import java.io.File;
 import java.util.List;
@@ -39,10 +40,12 @@ public class CompileWithJavac implements Task<GitDiffMessage, CompileWithJavacMe
             throw new IllegalArgumentException("No files to compile from the previous step");
         }
 
-        telemetry.message("Copying project .class files...");
+        telemetry.message("Copy project .class files...");
 
         if (copyClassFiles(telemetry)) {
+            telemetry.message("Copying complete");
         } else {
+            telemetry.error("Failed to copy");
             return new CompileWithJavacMessage(ExecutionStatus.ERROR, "Failed to copy project .class files");
         }
 
@@ -65,8 +68,6 @@ public class CompileWithJavac implements Task<GitDiffMessage, CompileWithJavacMe
                 .add(new Parameter("/home/afomenkov/workspace/client-android/presentation/app/build/intermediates/classes/googlePlayStoreAgoda/debug/."))
                 .add(new Parameter("/home/afomenkov/workspace/client-android/build/greencat/compile"))
                 .build();
-
-        telemetry.message("Command: %s", cmd);
 
         List<String> output = CommandExecutor.exec(cmd);
         for (String line : output) {

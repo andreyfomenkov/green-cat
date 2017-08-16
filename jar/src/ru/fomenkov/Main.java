@@ -28,7 +28,7 @@ public class Main {
         }
 
         String projectPath = input.getProjectPath();
-        String classpath = "";
+        String classpath = input.getClasspath();
         File objDir = GreenCat.getCompileDir(projectPath);
 
         Telemetry telemetry = new Telemetry();

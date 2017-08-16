@@ -4,4 +4,5 @@ PROJECT_PATH=/home/afomenkov/workspace/client-android
 ANDROID_SDK_PATH=/opt/android/sdk
 GREENCAT_JAR_PATH=/home/afomenkov/workspace/green-cat/jar/out/artifacts/greencat_jar/jar.jar
 
+reset
 java -jar $GREENCAT_JAR_PATH -d $PROJECT_PATH -cp $CLASSPATH -sdk $ANDROID_SDK_PATH
