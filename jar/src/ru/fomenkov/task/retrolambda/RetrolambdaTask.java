@@ -83,8 +83,19 @@ public class RetrolambdaTask implements Task<CompileWithJavacMessage, ClassDesug
                 .add(new Parameter("-jar", jarFilePath))
                 .build();
 
-        telemetry.green("CMD: %s", cmd);
-        CommandExecutor.execNoOutput(cmd);
-        return true;
+        List<String> output = CommandExecutor.exec(cmd, false);
+        boolean success = true;
+
+        for (String line : output) {
+            line = line.trim();
+
+            if (line.startsWith("Saving") || line.startsWith("Classpath") ) {
+                continue;
+            } else if (line.startsWith("Error!")) {
+                success = false;
+            }
+            telemetry.message(line);
+        }
+        return success;
     }
 }

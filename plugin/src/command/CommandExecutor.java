@@ -1,4 +1,4 @@
-package ru.fomenkov.command;
+package command;
 
 import java.io.BufferedReader;
 import java.io.IOException;

@@ -5,15 +5,11 @@ import ru.fomenkov.task.ExecutionStatus;
 
 public class DexMessage extends Message {
 
-    public final String dexFilePath;
-
-    public DexMessage(String dexFilePath) {
+    public DexMessage() {
         super(ExecutionStatus.SUCCESS, null);
-        this.dexFilePath = dexFilePath;
     }
 
     public DexMessage(ExecutionStatus status, @Nullable String description) {
         super(status, description);
-        this.dexFilePath = null;
     }
 }

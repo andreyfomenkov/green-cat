@@ -4,8 +4,6 @@ import java.io.File;
 
 public class GreenCat {
 
-    public static final String PLUGIN_NAME = "GreenCat";
-    public static final String EVENT_LOG_GROUP_ID = "GreenCat";
     private static final String BUILD_PATH = "/build/greencat";
     private static final String COMPILE_PATH = BUILD_PATH + "/compile";
     private static final String LAMBDA_PATH = BUILD_PATH + "/lambda";

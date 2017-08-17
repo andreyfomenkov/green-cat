@@ -78,13 +78,13 @@ public class DexTask implements Task<ClassDesugarMessage, DexMessage> {
                 return new DexMessage(ExecutionStatus.ERROR, "Failed to create DEX file directory");
             }
 
-            telemetry.message("DEX file directory: %s", dexDir.getAbsolutePath());
+            telemetry.message("DEX files directory: %s", dexDir.getAbsolutePath());
 
             if (makeDex(telemetry, dxToolPath, lambdaDir.getAbsolutePath(), dexDir.getAbsolutePath())) {
-                telemetry.message("DEX file created");
-                return new DexMessage(dexDir + "/classes.dex");
+                telemetry.message("DEX file(s) created");
+                return new DexMessage();
             } else {
-                telemetry.error("Failed to create DEX file");
+                telemetry.error("Failed to create DEX file(ss)");
                 return new DexMessage(ExecutionStatus.ERROR, "Failed to create DEX file");
             }
         } else {
@@ -101,13 +101,11 @@ public class DexTask implements Task<ClassDesugarMessage, DexMessage> {
                 .add(new Parameter(lambdaPath + "/"))
                 .build();
 
-        telemetry.message("Command: %s", cmd);
-        CommandExecutor.execNoOutput(cmd);
-//        List<String> output = CommandExecutor.exec(cmd);
-//
-//        for (String line : output) {
-//            telemetry.message(line);
-//        }
+        List<String> output = CommandExecutor.exec(cmd, true);
+        for (String line : output) {
+            telemetry.message(line);
+        }
+
         return true;
     }
 }

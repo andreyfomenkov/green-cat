@@ -54,7 +54,6 @@ public class TaskExecutor {
         int size = taskList.size();
         long startTime = System.nanoTime();
 
-        telemetry.clear();
         telemetry.green("* * * * * * * * * * * * * * *");
         telemetry.green("* GREENCAT TELEMETRY REPORT *");
         telemetry.green("* * * * * * * * * * * * * * *");

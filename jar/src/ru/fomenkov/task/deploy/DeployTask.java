@@ -1,10 +1,13 @@
-package ru.fomenkov.task;
+package ru.fomenkov.task.deploy;
 
 import ru.fomenkov.command.CommandExecutor;
 import ru.fomenkov.command.CommandLineBuilder;
 import ru.fomenkov.command.Parameter;
 import ru.fomenkov.message.DeployMessage;
 import ru.fomenkov.message.DexMessage;
+import ru.fomenkov.task.ExecutionStatus;
+import ru.fomenkov.task.Task;
+import ru.fomenkov.task.TaskPurpose;
 import ru.fomenkov.telemetry.Telemetry;
 
 import java.util.List;
@@ -14,11 +17,13 @@ import static ru.fomenkov.util.Utils.fileExists;
 public class DeployTask implements Task<DexMessage, DeployMessage> {
 
     private final String androidSdkPath;
-    private final String deployFilePath;
+    private final String dexPath;
+    private final String deployPath;
 
-    public DeployTask(String androidSdkPath, String deployPath, String filename) {
+    public DeployTask(String androidSdkPath, String dexPath, String deployPath) {
         this.androidSdkPath = androidSdkPath;
-        this.deployFilePath = deployPath + "/" + filename;
+        this.dexPath = dexPath;
+        this.deployPath = deployPath;
     }
 
     @Override
@@ -28,20 +33,21 @@ public class DeployTask implements Task<DexMessage, DeployMessage> {
 
     @Override
     public DeployMessage exec(Telemetry telemetry, DexMessage message) {
-        telemetry.message("Pushing DEX file to device: %s", deployFilePath);
+        telemetry.message("Pushing DEX file to device: %s", deployPath);
 
-        if (fileExists(message.dexFilePath)) {
-            telemetry.message("DEX file: %s", message.dexFilePath);
+        if (fileExists(dexPath)) {
+            telemetry.message("DEX path: %s", dexPath);
         } else {
-            telemetry.error("DEX file not found: %s", message.dexFilePath);
+            telemetry.error("DEX path not found: %s", dexPath);
             return new DeployMessage(ExecutionStatus.ERROR, "DEX file not found");
         }
 
         String cmd = CommandLineBuilder.create(androidSdkPath + "/platform-tools/adb")
-                .add(new Parameter("push", message.dexFilePath))
-                .add(new Parameter(deployFilePath))
+                .add(new Parameter("push", dexPath + "/classes.dex"))// TODO
+                .add(new Parameter(deployPath + "/delta.dex")) // TODO
                 .build();
-        List<String> output = CommandExecutor.exec(cmd);
+
+        List<String> output = CommandExecutor.exec(cmd, false);
         boolean success = false;
 
         for (String line : output) {
@@ -49,7 +55,10 @@ public class DeployTask implements Task<DexMessage, DeployMessage> {
                 success = true;
                 continue;
             }
-            telemetry.message(line.replace("%", ""));
+
+            if (!line.trim().startsWith("[")) {
+                telemetry.message(line.replace("%", ""));
+            }
         }
 
         if (success) {

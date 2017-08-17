@@ -69,7 +69,7 @@ public class CompileWithJavac implements Task<GitDiffMessage, CompileWithJavacMe
                 .add(new Parameter("/home/afomenkov/workspace/client-android/build/greencat/compile"))
                 .build();
 
-        List<String> output = CommandExecutor.exec(cmd);
+        List<String> output = CommandExecutor.exec(cmd, false);
         for (String line : output) {
             telemetry.message(line);
         }
@@ -78,7 +78,7 @@ public class CompileWithJavac implements Task<GitDiffMessage, CompileWithJavacMe
 
     private boolean compileWithJavac(Telemetry telemetry, List<File> javaFiles, String classpath) {
         String cmd = CommandLineBuilder.create("which javac").build();
-        List<String> output = CommandExecutor.exec(cmd);
+        List<String> output = CommandExecutor.exec(cmd, false);
 
         if (output.isEmpty()) {
             telemetry.error("Can't find java compiler");
@@ -102,7 +102,7 @@ public class CompileWithJavac implements Task<GitDiffMessage, CompileWithJavacMe
                 .add(new Parameter(srcBuilder.toString()))
                 .build();
 
-        output = CommandExecutor.exec(cmd);
+        output = CommandExecutor.exec(cmd, true);
         boolean compilationSuccess = true;
 
         for (String line : output) {

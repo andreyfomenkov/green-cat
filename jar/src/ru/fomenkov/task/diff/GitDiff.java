@@ -32,7 +32,7 @@ public class GitDiff implements Task<CleanBuildMessage, GitDiffMessage> {
 
         // git version => git version ...
         String cmd = CommandLineBuilder.create("git version").build();
-        List<String> output = CommandExecutor.exec(cmd);
+        List<String> output = CommandExecutor.exec(cmd, false);
         telemetry.message("Checking for git binary");
 
         if (output.size() > 0) {
@@ -55,7 +55,7 @@ public class GitDiff implements Task<CleanBuildMessage, GitDiffMessage> {
                 .add(new Parameter("-C", projectPath))
                 .add(new Parameter("log", "-1"))
                 .build();
-        output = CommandExecutor.exec(cmd);
+        output = CommandExecutor.exec(cmd, false);
 
         if (output.size() > 0) {
             String line = output.get(0).trim();
@@ -77,7 +77,7 @@ public class GitDiff implements Task<CleanBuildMessage, GitDiffMessage> {
                 .add(new Parameter("-C", projectPath))
                 .add(new Parameter("status"))
                 .build();
-        output = CommandExecutor.exec(cmd);
+        output = CommandExecutor.exec(cmd, false);
 
         List<File> modifiedFiles = new ArrayList<>();
         List<File> untrackedFiles = new ArrayList<>();

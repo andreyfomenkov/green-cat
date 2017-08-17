@@ -5,6 +5,24 @@ public class LibraryInput {
     private String projectPath;
     private String classpath;
     private String androidSdkPath;
+    private String packageName;
+    private String mainActivity;
+
+    public void setPackageName(String packageName) {
+        this.packageName = packageName;
+    }
+
+    public String getPackageName() {
+        return packageName;
+    }
+
+    public void setMainActivity(String mainActivity) {
+        this.mainActivity = mainActivity;
+    }
+
+    public String getMainActivity() {
+        return mainActivity;
+    }
 
     public String getAndroidSdkPath() {
         return androidSdkPath;
