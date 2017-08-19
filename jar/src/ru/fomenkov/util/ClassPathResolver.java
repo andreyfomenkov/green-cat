@@ -51,7 +51,7 @@ public class ClassPathResolver {
                 iterator.remove();
 
 //                if (verbose) {
-//                    Logger.d("[SRC NOT FOUND] %s -> REMOVED FROM CLASSPATH_PROD", path);
+//                    Logger.d("[SRC NOT FOUND] %s -> REMOVED FROM CLASSPATH_PROD", modulePath);
 //                }
             }
         }
@@ -66,7 +66,7 @@ public class ClassPathResolver {
                 iterator.remove();
 
 //                if (verbose) {
-//                    Logger.d("[LIB NOT FOUND] %s -> REMOVED FROM CLASSPATH_PROD", path);
+//                    Logger.d("[LIB NOT FOUND] %s -> REMOVED FROM CLASSPATH_PROD", modulePath);
 //                }
             }
         }

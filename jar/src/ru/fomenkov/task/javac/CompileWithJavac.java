@@ -9,7 +9,6 @@ import ru.fomenkov.task.ExecutionStatus;
 import ru.fomenkov.task.Task;
 import ru.fomenkov.task.TaskPurpose;
 import ru.fomenkov.telemetry.Telemetry;
-import ru.fomenkov.util.Log;
 
 import java.io.File;
 import java.util.List;
@@ -69,7 +68,7 @@ public class CompileWithJavac implements Task<GitDiffMessage, CompileWithJavacMe
                 .add(new Parameter("/home/afomenkov/workspace/client-android/build/greencat/compile"))
                 .build();
 
-        List<String> output = CommandExecutor.exec(cmd, false);
+        List<String> output = CommandExecutor.execOnInputStream(cmd);
         for (String line : output) {
             telemetry.message(line);
         }
@@ -78,7 +77,7 @@ public class CompileWithJavac implements Task<GitDiffMessage, CompileWithJavacMe
 
     private boolean compileWithJavac(Telemetry telemetry, List<File> javaFiles, String classpath) {
         String cmd = CommandLineBuilder.create("which javac").build();
-        List<String> output = CommandExecutor.exec(cmd, false);
+        List<String> output = CommandExecutor.execOnInputStream(cmd);
 
         if (output.isEmpty()) {
             telemetry.error("Can't find java compiler");
@@ -102,7 +101,7 @@ public class CompileWithJavac implements Task<GitDiffMessage, CompileWithJavacMe
                 .add(new Parameter(srcBuilder.toString()))
                 .build();
 
-        output = CommandExecutor.exec(cmd, true);
+        output = CommandExecutor.execOnErrorStream(cmd);
         boolean compilationSuccess = true;
 
         for (String line : output) {

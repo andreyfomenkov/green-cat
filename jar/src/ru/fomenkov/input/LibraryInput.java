@@ -3,6 +3,7 @@ package ru.fomenkov.input;
 public class LibraryInput {
 
     private String projectPath;
+    private String[] projectModules;
     private String classpath;
     private String androidSdkPath;
     private String packageName;
@@ -48,8 +49,11 @@ public class LibraryInput {
         this.classpath = classpath;
     }
 
-    @Override
-    public String toString() {
-        return String.format("PROJECT PATH: %s, ANDROID SDK PATH: %s, CLASSPATH: %s", projectPath, androidSdkPath, classpath);
+    public void setProjectModules(String[] modules) {
+        this.projectModules = modules;
+    }
+
+    public String[] getProjectModules() {
+        return projectModules;
     }
 }

@@ -1,17 +1,13 @@
 package ru.fomenkov;
 
-import ru.fomenkov.exception.MissingArgumentsException;
+import ru.fomenkov.exception.MissedArgumentsException;
 import ru.fomenkov.input.LibraryInput;
 import ru.fomenkov.input.LibraryInputReader;
 import ru.fomenkov.message.ProjectSetup;
 import ru.fomenkov.task.TaskExecutor;
-import ru.fomenkov.task.cleanup.CleanupTask;
-import ru.fomenkov.task.deploy.DeployTask;
-import ru.fomenkov.task.dex.DexTask;
-import ru.fomenkov.task.diff.GitDiff;
-import ru.fomenkov.task.javac.CompileWithJavac;
-import ru.fomenkov.task.restart.RestartAppTask;
-import ru.fomenkov.task.retrolambda.RetrolambdaTask;
+import ru.fomenkov.task.diff.GitDiffTask;
+import ru.fomenkov.task.resolve.ModulesResolveTask;
+import ru.fomenkov.task.setup.ProjectSetupTask;
 import ru.fomenkov.telemetry.Telemetry;
 
 import java.io.File;
@@ -24,7 +20,7 @@ public class Main {
 
         try {
             input = reader.read();
-        } catch (MissingArgumentsException ignore) {
+        } catch (MissedArgumentsException ignore) {
             return;
         }
 
@@ -41,13 +37,14 @@ public class Main {
         Telemetry telemetry = new Telemetry();
         ProjectSetup launchMessage = new ProjectSetup(projectPath);
         TaskExecutor executor = TaskExecutor.create(launchMessage, telemetry)
-                .add(new CleanupTask())
-                .add(new GitDiff())
-                .add(new CompileWithJavac(projectPath, classpath, compileDir))
-                .add(new RetrolambdaTask(compileDir.getAbsolutePath(), lambdaDir.getAbsolutePath()))
-                .add(new DexTask(androidSdkPath, lambdaDir, dexDir))
-                .add(new DeployTask(androidSdkPath, dexDir.getAbsolutePath(), deployPath))
-                .add(new RestartAppTask(androidSdkPath, packageName, mainActivity));
+                .add(new ProjectSetupTask())
+                .add(new ModulesResolveTask())
+                .add(new GitDiffTask());
+//                .add(new CompileWithJavac(projectPath, classpath, compileDir))
+//                .add(new RetrolambdaTask(compileDir.getAbsolutePath(), lambdaDir.getAbsolutePath()))
+//                .add(new DexTask(androidSdkPath, lambdaDir, dexDir))
+//                .add(new DeployTask(androidSdkPath, dexDir.getAbsolutePath(), deployPath))
+//                .add(new RestartAppTask(androidSdkPath, packageName, mainActivity));
 
         TaskExecutor.Result result = executor.execute();
 

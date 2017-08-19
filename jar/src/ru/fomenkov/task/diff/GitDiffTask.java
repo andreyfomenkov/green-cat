@@ -1,11 +1,14 @@
 package ru.fomenkov.task.diff;
 
 import com.google.common.collect.ImmutableList;
+import com.sun.istack.internal.Nullable;
+import ru.fomenkov.Module;
 import ru.fomenkov.command.CommandExecutor;
 import ru.fomenkov.command.CommandLineBuilder;
 import ru.fomenkov.command.Parameter;
-import ru.fomenkov.message.CleanBuildMessage;
 import ru.fomenkov.message.GitDiffMessage;
+import ru.fomenkov.message.ModulesResolveMessage;
+import ru.fomenkov.message.ProjectSetupMessage;
 import ru.fomenkov.task.ExecutionStatus;
 import ru.fomenkov.task.Task;
 import ru.fomenkov.task.TaskPurpose;
@@ -15,7 +18,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
-public class GitDiff implements Task<CleanBuildMessage, GitDiffMessage> {
+public class GitDiffTask implements Task<ModulesResolveMessage, GitDiffMessage> {
 
     @Override
     public TaskPurpose getPurpose() {
@@ -23,7 +26,7 @@ public class GitDiff implements Task<CleanBuildMessage, GitDiffMessage> {
     }
 
     @Override
-    public GitDiffMessage exec(Telemetry telemetry, CleanBuildMessage message) {
+    public GitDiffMessage exec(Telemetry telemetry, ModulesResolveMessage message) {
         if (message.status != ExecutionStatus.SUCCESS) {
             throw new IllegalArgumentException("Previous step execution failed");
         }
@@ -32,7 +35,7 @@ public class GitDiff implements Task<CleanBuildMessage, GitDiffMessage> {
 
         // git version => git version ...
         String cmd = CommandLineBuilder.create("git version").build();
-        List<String> output = CommandExecutor.exec(cmd, false);
+        List<String> output = CommandExecutor.execOnInputStream(cmd);
         telemetry.message("Checking for git binary");
 
         if (output.size() > 0) {
@@ -55,7 +58,7 @@ public class GitDiff implements Task<CleanBuildMessage, GitDiffMessage> {
                 .add(new Parameter("-C", projectPath))
                 .add(new Parameter("log", "-1"))
                 .build();
-        output = CommandExecutor.exec(cmd, false);
+        output = CommandExecutor.execOnInputStream(cmd);
 
         if (output.size() > 0) {
             String line = output.get(0).trim();
@@ -77,7 +80,7 @@ public class GitDiff implements Task<CleanBuildMessage, GitDiffMessage> {
                 .add(new Parameter("-C", projectPath))
                 .add(new Parameter("status"))
                 .build();
-        output = CommandExecutor.exec(cmd, false);
+        output = CommandExecutor.execOnInputStream(cmd);
 
         List<File> modifiedFiles = new ArrayList<>();
         List<File> untrackedFiles = new ArrayList<>();
@@ -125,7 +128,14 @@ public class GitDiff implements Task<CleanBuildMessage, GitDiffMessage> {
                     String path = file.getAbsolutePath().replace(projectPath, "");
 
                     if (isSupportedFileFormat(file)) {
-                        telemetry.message("* %s", path);
+                        Module module = getSourceFileModule(message.getProjectModules(), file.getAbsolutePath());
+
+                        if (module == null) {
+                            telemetry.error("Can't find module for source file: %s", path);
+                            return new GitDiffMessage(ExecutionStatus.ERROR, "Can't find module for source file");
+                        }
+
+                        telemetry.message("* %s [%s]", path, module.name);
                     } else {
                         telemetry.warn("* %s [!]", path);
                         hasUnsupportedFiles = true;
@@ -168,6 +178,16 @@ public class GitDiff implements Task<CleanBuildMessage, GitDiffMessage> {
         }
 
         return new GitDiffMessage(sourceFileList);
+    }
+
+    @Nullable
+    private Module getSourceFileModule(List<Module> modules, String path) {
+        for (Module module : modules) {
+            if (path.startsWith(module.modulePath + "/")) {
+                return module;
+            }
+        }
+        return null;
     }
 
     private List<File> filterSupportedFiles(List<File> in) {

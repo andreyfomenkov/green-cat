@@ -1,8 +1,9 @@
 package ru.fomenkov.task;
 
 public enum TaskPurpose {
+    SETUP_PROJECT("Setting up build paths"),
+    RESOLVE_MODULES("Resolving project modules"),
     GIT_DIFF("Determining source changes"),
-    CLEANUP_BUILD("Cleaning up build folder"),
     COMPILE_WITH_JAVAC("Compiling with javac"),
     ANNOTATION_PROCESSING("Annotation processing"),
     COMPILE_WITH_KOTLIN("Compiling with Kotlin"),

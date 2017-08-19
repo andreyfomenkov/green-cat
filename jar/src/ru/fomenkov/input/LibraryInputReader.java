@@ -1,6 +1,6 @@
 package ru.fomenkov.input;
 
-import ru.fomenkov.exception.MissingArgumentsException;
+import ru.fomenkov.exception.MissedArgumentsException;
 import ru.fomenkov.util.Log;
 
 import java.util.HashSet;
@@ -14,19 +14,23 @@ public class LibraryInputReader {
     public LibraryInputReader(String[] args) {
         this.args = args;
         requiredArguments.add(Argument.PROJECT_PATH);
+        requiredArguments.add(Argument.PROJECT_MODULES);
         requiredArguments.add(Argument.CLASSPATH);
         requiredArguments.add(Argument.ANDROID_SDK_PATH);
         requiredArguments.add(Argument.PACKAGE);
         requiredArguments.add(Argument.MAIN_ACTIVITY);
     }
 
-    public LibraryInput read() throws MissingArgumentsException {
+    public LibraryInput read() throws MissedArgumentsException {
         LibraryInput input = new LibraryInput();
         Argument nextArg = null;
 
         for (String arg : args) {
             if (Argument.PROJECT_PATH.value().equals(arg)) {
                 nextArg = Argument.PROJECT_PATH;
+
+            } else if (Argument.PROJECT_MODULES.value().equals(arg)) {
+                nextArg = Argument.PROJECT_MODULES;
 
             } else if (Argument.CLASSPATH.value().equals(arg)) {
                 nextArg = Argument.CLASSPATH;
@@ -42,11 +46,15 @@ public class LibraryInputReader {
             } else {
                 if (nextArg == null) {
                     Log.e("Invalid argument found: %s", arg);
-                    throw new MissingArgumentsException("Invalid argument");
+                    throw new MissedArgumentsException("Invalid argument");
                 } else {
                     switch (nextArg) {
                         case PROJECT_PATH:
                             input.setProjectPath(arg);
+                            break;
+                        case PROJECT_MODULES:
+                            String[] modules = arg.split(":");
+                            input.setProjectModules(modules);
                             break;
                         case CLASSPATH:
                             input.setClasspath(arg);
@@ -67,7 +75,7 @@ public class LibraryInputReader {
 
             if (nextArg != null && !requiredArguments.remove(nextArg)) {
                 Log.e("Duplicate argument found: %s", nextArg.value());
-                throw new MissingArgumentsException("Duplicate argument found");
+                throw new MissedArgumentsException("Duplicate argument found");
             }
         }
 
@@ -79,7 +87,7 @@ public class LibraryInputReader {
             }
 
             Log.e("Missing required arguments: %s", builder);
-            throw new MissingArgumentsException("Missing some input arguments");
+            throw new MissedArgumentsException("Missing some input arguments");
         }
 
         return input;

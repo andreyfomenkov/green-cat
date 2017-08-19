@@ -36,9 +36,9 @@ public class DeployTask implements Task<DexMessage, DeployMessage> {
         telemetry.message("Pushing DEX file to device: %s", deployPath);
 
         if (fileExists(dexPath)) {
-            telemetry.message("DEX path: %s", dexPath);
+            telemetry.message("DEX modulePath: %s", dexPath);
         } else {
-            telemetry.error("DEX path not found: %s", dexPath);
+            telemetry.error("DEX modulePath not found: %s", dexPath);
             return new DeployMessage(ExecutionStatus.ERROR, "DEX file not found");
         }
 
@@ -47,7 +47,7 @@ public class DeployTask implements Task<DexMessage, DeployMessage> {
                 .add(new Parameter(deployPath + "/delta.dex")) // TODO
                 .build();
 
-        List<String> output = CommandExecutor.exec(cmd, false);
+        List<String> output = CommandExecutor.execOnInputStream(cmd);
         boolean success = false;
 
         for (String line : output) {

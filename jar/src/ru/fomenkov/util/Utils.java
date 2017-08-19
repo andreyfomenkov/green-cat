@@ -19,7 +19,7 @@ public class Utils {
                 .add(new Parameter(path))
                 .add(new Parameter("-name", pattern))
                 .build();
-        return CommandExecutor.exec(cmd, false);
+        return CommandExecutor.execOnInputStream(cmd);
     }
 
     public static boolean fileExists(String path) {

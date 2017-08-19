@@ -37,10 +37,10 @@ public class DexTask implements Task<ClassDesugarMessage, DexMessage> {
         telemetry.message("Looking for Android SDK directory...");
 
         if (androidSdkPath != null) {
-            telemetry.message("Android SDK path: %s", androidSdkPath);
+            telemetry.message("Android SDK modulePath: %s", androidSdkPath);
         } else {
-            telemetry.error("Failed to get Android SDK path");
-            return new DexMessage(ExecutionStatus.ERROR, "Failed to get Android SDK path");
+            telemetry.error("Failed to get Android SDK modulePath");
+            return new DexMessage(ExecutionStatus.ERROR, "Failed to get Android SDK modulePath");
         }
 
         File buildToolsDir = new File(androidSdkPath + "/build-tools");
@@ -74,9 +74,17 @@ public class DexTask implements Task<ClassDesugarMessage, DexMessage> {
             telemetry.message("Using build tools %s for dx tool", dirList.get(size - 1).getName());
 
             if (!dexDir.exists() && !dexDir.mkdirs()) {
-                telemetry.error("Failed to create path: %s", dexDir.getAbsolutePath());
+                telemetry.error("Failed to create modulePath: %s", dexDir.getAbsolutePath());
                 return new DexMessage(ExecutionStatus.ERROR, "Failed to create DEX file directory");
             }
+
+            telemetry.message("Cleaning up unused .class files...");
+            // TODO
+            List<String> output = CommandExecutor.execOnInputStream("find /home/afomenkov/workspace/client-android/build/greencat/lambda -type f ! \\( -name 'LoginFragment*.class' \\) -print0 | xargs -0 rm --");
+            for (String line : output) {
+                telemetry.message(line);
+            }
+            // TODO
 
             telemetry.message("DEX files directory: %s", dexDir.getAbsolutePath());
 
@@ -88,8 +96,8 @@ public class DexTask implements Task<ClassDesugarMessage, DexMessage> {
                 return new DexMessage(ExecutionStatus.ERROR, "Failed to create DEX file");
             }
         } else {
-            telemetry.error("Directory /build-tools doesn't exist in Android SDK path");
-            return new DexMessage(ExecutionStatus.ERROR, "Directory /build-tools doesn't exist in Android SDK path");
+            telemetry.error("Directory /build-tools doesn't exist in Android SDK modulePath");
+            return new DexMessage(ExecutionStatus.ERROR, "Directory /build-tools doesn't exist in Android SDK modulePath");
         }
     }
 
@@ -101,7 +109,7 @@ public class DexTask implements Task<ClassDesugarMessage, DexMessage> {
                 .add(new Parameter(lambdaPath + "/"))
                 .build();
 
-        List<String> output = CommandExecutor.exec(cmd, true);
+        List<String> output = CommandExecutor.execOnInputStream(cmd);
         for (String line : output) {
             telemetry.message(line);
         }
