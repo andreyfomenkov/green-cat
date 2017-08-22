@@ -27,7 +27,7 @@ public class RestartAppTask implements Task<DeployMessage, RestartAppMessage> {
     @Override
     public RestartAppMessage exec(Telemetry telemetry, DeployMessage message) {
         telemetry.message("Application package: %s", appPackage);
-        telemetry.message("Application launcher activity: %s", mainActivity);
+        telemetry.message("Activity for launch: %s", mainActivity);
         telemetry.message("Restarting...");
 
         String adbFilePath = androidSdkPath + "/platform-tools/adb";

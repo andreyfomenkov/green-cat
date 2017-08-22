@@ -78,14 +78,6 @@ public class DexTask implements Task<ClassDesugarMessage, DexMessage> {
                 return new DexMessage(ExecutionStatus.ERROR, "Failed to create DEX file directory");
             }
 
-            telemetry.message("Cleaning up unused .class files...");
-            // TODO
-            List<String> output = CommandExecutor.execOnInputStream("find /home/afomenkov/workspace/client-android/build/greencat/lambda -type f ! \\( -name 'LoginFragment*.class' \\) -print0 | xargs -0 rm --");
-            for (String line : output) {
-                telemetry.message(line);
-            }
-            // TODO
-
             telemetry.message("DEX files directory: %s", dexDir.getAbsolutePath());
 
             if (makeDex(telemetry, dxToolPath, lambdaDir.getAbsolutePath(), dexDir.getAbsolutePath())) {

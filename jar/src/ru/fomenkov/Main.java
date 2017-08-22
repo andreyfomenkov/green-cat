@@ -8,8 +8,11 @@ import ru.fomenkov.message.GitDiffMessage;
 import ru.fomenkov.message.ProjectSetup;
 import ru.fomenkov.task.ExecutionStatus;
 import ru.fomenkov.task.TaskExecutor;
+import ru.fomenkov.task.deploy.DeployTask;
+import ru.fomenkov.task.dex.DexTask;
 import ru.fomenkov.task.diff.GitDiffTask;
 import ru.fomenkov.task.resolve.ModulesResolveTask;
+import ru.fomenkov.task.restart.RestartAppTask;
 import ru.fomenkov.task.setup.ProjectSetupTask;
 import ru.fomenkov.telemetry.Telemetry;
 import ru.fomenkov.util.Log;
@@ -35,13 +38,6 @@ public class Main {
         }
 
         String projectPath = input.getProjectPath();
-        String androidSdkPath = input.getAndroidSdkPath();
-        String packageName = input.getPackageName();
-        String mainActivity = input.getMainActivity();
-        String deployPath = GreenCat.getDexDeployPath();
-        File lambdaDir = GreenCat.getLambdaDir(projectPath);
-        File dexDir = GreenCat.getDexBuildDir(projectPath);
-
         Telemetry resolveTelemetry = new Telemetry();
         resolveTelemetry.green("* * * * * * * * * * * * * * *");
         resolveTelemetry.green("* GREENCAT TELEMETRY REPORT *");
@@ -75,11 +71,26 @@ public class Main {
 
         if (!doIncrementalBuild(input, diff)) {
             buildTelemetry.error("COMPILATION FAILED");
+            buildTelemetry.print();
             return;
         }
 
         if (!prepareClassesForDex(input, diff)) {
             buildTelemetry.error("PREPARING CLASSES FOR DEX FAILED");
+            buildTelemetry.print();
+            return;
+        }
+
+        String androidSdkPath = input.getAndroidSdkPath();
+        File lambdaDir = GreenCat.getLambdaDir(projectPath);
+        File dexDir = GreenCat.getDexBuildDir(projectPath);
+        String packageName = input.getPackageName();
+        String mainActivity = input.getMainActivity();
+        String deployPath = GreenCat.getDexDeployPath();
+
+        if (!makeDexAndDeploy(androidSdkPath, lambdaDir, dexDir, deployPath, packageName, mainActivity)) {
+            buildTelemetry.error("DEXING AND DEPLOYMENT FAILED");
+            buildTelemetry.print();
             return;
         }
 
@@ -88,13 +99,16 @@ public class Main {
         buildTelemetry.print();
     }
 
-    private static TaskExecutor.Result resolveProject(Telemetry telemetry, String projectPath) {
-        ProjectSetup launchMessage = new ProjectSetup(projectPath);
-        TaskExecutor executor = TaskExecutor.create(launchMessage, telemetry)
-                .add(new ProjectSetupTask())
-                .add(new ModulesResolveTask())
-                .add(new GitDiffTask());
-        return executor.execute();
+    private static boolean makeDexAndDeploy(String androidSdkPath, File lambdaDir, File dexDir, String deployPath,
+                                            String appPackage, String launcherActivity) {
+        Telemetry telemetry = new Telemetry();
+        TaskExecutor.Result result = TaskExecutor.create(null, telemetry)
+                .add(new DexTask(androidSdkPath, lambdaDir, dexDir))
+                .add(new DeployTask(androidSdkPath, dexDir.getAbsolutePath(), deployPath))
+                .add(new RestartAppTask(androidSdkPath, appPackage, launcherActivity))
+                .execute();
+        telemetry.print();
+        return result.status == ExecutionStatus.SUCCESS;
     }
 
     private static final String FIND_WITH_REMOVE_COMMAND = "find %s -type f ! \\( %s \\) -print0 | xargs -0 rm --";
@@ -186,5 +200,14 @@ public class Main {
 
         service.shutdown();
         return success;
+    }
+
+    private static TaskExecutor.Result resolveProject(Telemetry telemetry, String projectPath) {
+        ProjectSetup launchMessage = new ProjectSetup(projectPath);
+        TaskExecutor executor = TaskExecutor.create(launchMessage, telemetry)
+                .add(new ProjectSetupTask())
+                .add(new ModulesResolveTask())
+                .add(new GitDiffTask());
+        return executor.execute();
     }
 }
