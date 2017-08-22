@@ -8,15 +8,13 @@ import ru.fomenkov.command.CommandLineBuilder;
 import ru.fomenkov.command.Parameter;
 import ru.fomenkov.message.GitDiffMessage;
 import ru.fomenkov.message.ModulesResolveMessage;
-import ru.fomenkov.message.ProjectSetupMessage;
 import ru.fomenkov.task.ExecutionStatus;
 import ru.fomenkov.task.Task;
 import ru.fomenkov.task.TaskPurpose;
 import ru.fomenkov.telemetry.Telemetry;
 
 import java.io.File;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 public class GitDiffTask implements Task<ModulesResolveMessage, GitDiffMessage> {
 
@@ -177,7 +175,15 @@ public class GitDiffTask implements Task<ModulesResolveMessage, GitDiffMessage> 
             telemetry.message("No source changes to compile");
         }
 
-        return new GitDiffMessage(sourceFileList);
+        Map<Module, Set<File>> filesMap = new HashMap<>();
+
+        for (File file : sourceFileList) {
+            Module module = getSourceFileModule(message.getProjectModules(), file.getAbsolutePath());
+            Set<File> files = filesMap.computeIfAbsent(module, k -> new HashSet<>());
+            files.add(file);
+        }
+
+        return new GitDiffMessage(filesMap);
     }
 
     @Nullable

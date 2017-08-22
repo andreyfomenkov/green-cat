@@ -1,10 +1,12 @@
 package ru.fomenkov.task.javac;
 
+import ru.fomenkov.GreenCat;
+import ru.fomenkov.Module;
 import ru.fomenkov.command.CommandExecutor;
 import ru.fomenkov.command.CommandLineBuilder;
 import ru.fomenkov.command.Parameter;
 import ru.fomenkov.message.CompileWithJavacMessage;
-import ru.fomenkov.message.GitDiffMessage;
+import ru.fomenkov.message.ModuleDiffMessage;
 import ru.fomenkov.task.ExecutionStatus;
 import ru.fomenkov.task.Task;
 import ru.fomenkov.task.TaskPurpose;
@@ -12,15 +14,16 @@ import ru.fomenkov.telemetry.Telemetry;
 
 import java.io.File;
 import java.util.List;
+import java.util.Set;
 
 
-public class CompileWithJavac implements Task<GitDiffMessage, CompileWithJavacMessage> {
+public class CompileWithJavacTask implements Task<ModuleDiffMessage, CompileWithJavacMessage> {
 
     private final String classpath;
     private final String projectPath;
     private final File objDir;
 
-    public CompileWithJavac(String projectPath, String classpath, File objDir) {
+    public CompileWithJavacTask(String projectPath, String classpath, File objDir) {
         this.projectPath = projectPath;
         this.classpath = classpath;
         this.objDir = objDir;
@@ -32,16 +35,16 @@ public class CompileWithJavac implements Task<GitDiffMessage, CompileWithJavacMe
     }
 
     @Override
-    public CompileWithJavacMessage exec(Telemetry telemetry, GitDiffMessage message) {
+    public CompileWithJavacMessage exec(Telemetry telemetry, ModuleDiffMessage message) {
         if (message.status != ExecutionStatus.SUCCESS) {
             throw new IllegalArgumentException("Previous step execution failed");
-        } else if (message.getFileList().isEmpty()) {
+        } else if (message.getFiles().isEmpty()) {
             throw new IllegalArgumentException("No files to compile from the previous step");
         }
 
         telemetry.message("Copy project .class files...");
 
-        if (copyClassFiles(telemetry)) {
+        if (copyClassFiles(telemetry, projectPath, message.getModule())) {
             telemetry.message("Copying complete");
         } else {
             telemetry.error("Failed to copy");
@@ -50,22 +53,29 @@ public class CompileWithJavac implements Task<GitDiffMessage, CompileWithJavacMe
 
         telemetry.message("Compiling with javac...");
 
-        if (compileWithJavac(telemetry, message.getFileList(), classpath)) {
-            return new CompileWithJavacMessage(classpath);
+        if (compileWithJavac(telemetry, message.getFiles(), classpath)) {
+            return new CompileWithJavacMessage(projectPath, classpath);
         } else {
             return new CompileWithJavacMessage(ExecutionStatus.ERROR, "Compilation errors");
         }
     }
 
-    private boolean copyClassFiles(Telemetry telemetry) {
+    private boolean copyClassFiles(Telemetry telemetry, String projectPath, Module module) {
         if (!objDir.exists() && !objDir.mkdirs()) {
             telemetry.error("Failed to create directory for classes: %s", objDir.getPath());
             return false;
         }
 
+        String srcPath = module.buildPath + "/.";
+        String dstPath = GreenCat.getCompileDir(projectPath, module.name).getAbsolutePath();
+
+        telemetry.message("Copying .class files...");
+        telemetry.message("From: %s", srcPath);
+        telemetry.message("To:   %s", dstPath);
+
         String cmd = CommandLineBuilder.create("cp -r")
-                .add(new Parameter("/home/afomenkov/workspace/client-android/presentation/app/build/intermediates/classes/googlePlayStoreAgoda/debug/."))
-                .add(new Parameter("/home/afomenkov/workspace/client-android/build/greencat/compile"))
+                .add(new Parameter(srcPath))
+                .add(new Parameter(dstPath))
                 .build();
 
         List<String> output = CommandExecutor.execOnInputStream(cmd);
@@ -75,7 +85,7 @@ public class CompileWithJavac implements Task<GitDiffMessage, CompileWithJavacMe
         return true;
     }
 
-    private boolean compileWithJavac(Telemetry telemetry, List<File> javaFiles, String classpath) {
+    private boolean compileWithJavac(Telemetry telemetry, Set<File> javaFiles, String classpath) {
         String cmd = CommandLineBuilder.create("which javac").build();
         List<String> output = CommandExecutor.execOnInputStream(cmd);
 
@@ -122,7 +132,7 @@ public class CompileWithJavac implements Task<GitDiffMessage, CompileWithJavacMe
         }
 
         telemetry.message("");
-        telemetry.message("Compilation %s", compilationSuccess ? "success" : "failed");
+        telemetry.message("Compilation %s", compilationSuccess ? "status" : "failed");
         return compilationSuccess;
     }
 }

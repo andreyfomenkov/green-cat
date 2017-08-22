@@ -5,7 +5,6 @@ import java.io.File;
 public class GreenCat {
 
     private static final String BUILD_PATH = "/build/greencat";
-    private static final String COMPILE_PATH = BUILD_PATH + "/compile";
     private static final String LAMBDA_PATH = BUILD_PATH + "/lambda";
     private static final String DEX_BUILD_PATH = BUILD_PATH + "/dex";
     private static final String DEX_DEPLOY_PATH = "/sdcard/greencat";
@@ -14,8 +13,8 @@ public class GreenCat {
         return new File(projectDir + BUILD_PATH);
     }
 
-    public static File getCompileDir(String projectDir) {
-        return new File(projectDir + COMPILE_PATH);
+    public static File getCompileDir(String projectDir, String moduleName) {
+        return new File(projectDir + BUILD_PATH + "/compile/" + moduleName);
     }
 
     public static File getLambdaDir(String projectDir) {

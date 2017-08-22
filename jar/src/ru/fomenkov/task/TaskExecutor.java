@@ -4,7 +4,6 @@ import com.sun.istack.internal.NotNull;
 import com.sun.istack.internal.Nullable;
 import ru.fomenkov.message.Message;
 import ru.fomenkov.telemetry.Telemetry;
-import ru.fomenkov.util.Utils;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -16,16 +15,18 @@ public class TaskExecutor {
 
         public final ExecutionStatus status;
         public final Task task;
+        public final Message message;
         public final @Nullable String description;
         public final long nanoTime;
 
-        public Result(Task task, @Nullable String description, ExecutionStatus status) {
-            this(task, description, status, -1);
+        public Result(Task task, Message message,  @Nullable String description, ExecutionStatus status) {
+            this(task, message, description, status, -1);
         }
 
-        public Result(Task task, @Nullable String description, ExecutionStatus status, long nanoTime) {
+        public Result(Task task, Message message, @Nullable String description, ExecutionStatus status, long nanoTime) {
             this.task = task;
             this.description = description;
+            this.message = message;
             this.status = status;
             this.nanoTime = nanoTime;
         }
@@ -54,10 +55,6 @@ public class TaskExecutor {
         int size = taskList.size();
         long startTime = System.nanoTime();
 
-        telemetry.green("* * * * * * * * * * * * * * *");
-        telemetry.green("* GREENCAT TELEMETRY REPORT *");
-        telemetry.green("* * * * * * * * * * * * * * *");
-
         for (int i = 0; i < size; i++) {
             Task task = taskList.get(i);
 
@@ -70,29 +67,27 @@ public class TaskExecutor {
                 if (message.status == ExecutionStatus.ERROR) {
                     telemetry.error("");
                     telemetry.error("TASK EXECUTION FAILED");
-                    return new Result(task, message.description, message.status);
+                    return new Result(task, message, message.description, message.status);
 
                 } else if (message.status == ExecutionStatus.TERMINATED) {
                     telemetry.warn("");
                     telemetry.warn("TASK EXECUTION TERMINATED");
-                    return new Result(task, message.description, message.status);
+                    return new Result(task, message, message.description, message.status);
                 }
             } catch (ClassCastException e) {
                 telemetry.error("");
                 telemetry.error("TASK EXECUTION FAILED: task message types mismatch");
-                return new Result(task, "task message types mismatch", ExecutionStatus.ERROR);
+                return new Result(task, message, "task message types mismatch", ExecutionStatus.ERROR);
 
             } catch (Exception e) {
                 telemetry.error("");
                 telemetry.error("TASK EXECUTION FAILED: %s", e.getLocalizedMessage());
-                return new Result(task, String.format("error: %s", e.getLocalizedMessage()), ExecutionStatus.ERROR);
+                return new Result(task, message, String.format("error: %s", e.getLocalizedMessage()), ExecutionStatus.ERROR);
             }
         }
 
         long endTime = System.nanoTime();
-        String delay = Utils.formatNanoTimeToSeconds(endTime - startTime);
         telemetry.green("");
-        telemetry.green("TASK(S) EXECUTION COMPLETE IN %s SEC", delay);
-        return new Result(taskList.get(size - 1), null, ExecutionStatus.SUCCESS, endTime - startTime);
+        return new Result(taskList.get(size - 1), message, null, ExecutionStatus.SUCCESS, endTime - startTime);
     }
 }

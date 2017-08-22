@@ -27,8 +27,17 @@ public class Deploy extends ProjectAction {
         window.show();
         window.clear();
 
+        Module[] modules = ModuleManager.getInstance(project).getModules();
+        StringBuilder moduleParam = new StringBuilder();
+
+        for (int i = 0; i < modules.length; i++) {
+            String path = modules[i].getModuleFilePath();
+            moduleParam.append(i == 0 ? "" : ":").append(path);
+        }
+
         String cmd = CommandLineBuilder.create("java")
                 .add(new Parameter("-jar", "/home/afomenkov/workspace/green-cat/jar/out/artifacts/greencat_jar/jar.jar"))
+                .add(new Parameter("-m", moduleParam.toString()))
                 .add(new Parameter("-d", projectPath))
                 .add(new Parameter("-cp", classpath))
                 .add(new Parameter("-sdk", androidSdkPath))

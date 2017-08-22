@@ -1,27 +1,30 @@
 package ru.fomenkov.message;
 
-import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.sun.istack.internal.Nullable;
+import ru.fomenkov.Module;
 import ru.fomenkov.task.ExecutionStatus;
 
 import java.io.File;
-import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
 
 public class GitDiffMessage extends Message {
 
-    private final List<File> fileList;
+    private final Map<Module, Set<File>> files;
 
-    public GitDiffMessage(List<File> fileList) {
-        super(fileList.isEmpty() ? ExecutionStatus.TERMINATED : ExecutionStatus.SUCCESS, null);
-        this.fileList = fileList;
+    public GitDiffMessage(Map<Module, Set<File>> files) {
+        super(files.isEmpty() ? ExecutionStatus.TERMINATED : ExecutionStatus.SUCCESS, null);
+        this.files = files;
     }
 
     public GitDiffMessage(ExecutionStatus status, @Nullable String description) {
         super(status, description);
-        this.fileList = ImmutableList.of();
+        this.files = new HashMap<>();
     }
 
-    public List<File> getFileList() {
-        return ImmutableList.copyOf(fileList);
+    public Map<Module, Set<File>> getFiles() {
+        return ImmutableMap.copyOf(files);
     }
 }
