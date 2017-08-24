@@ -1,6 +1,6 @@
 <idea-plugin version="2">
   <id>ru.fomenkov.idea.greencat</id>
-  <name>GreenCat</name>
+  <name>ui.GreenCat</name>
   <version>1.0</version>
   <vendor email="droideka@mail.ru" url="https://www.linkedin.com/in/andrey-fomenkov-8866a863/">Andrey Fomenkov</vendor>
 
@@ -34,12 +34,12 @@
   <actions>
 
     <!-- Deploy -->
-    <action id="GreenCat.Deploy" class="ui.action.Deploy" text="Deploy" description="Deploy Changes to Android Device" icon="/icons/deploy.png">
+    <action id="ui.GreenCat.Deploy" class="ui.action.Deploy" text="Deploy" description="Deploy Changes to Android Device" icon="/icons/deploy.png">
       <add-to-group group-id="RunnerActions" anchor="after" relative-to-action="Run"/>
     </action>
 
     <!-- Clean -->
-    <action id="GreenCat.Clean" class="ui.action.Clean" text="Clean Changes" description="Clean Build Directory" icon="/icons/clean.png">
+    <action id="ui.GreenCat.Clean" class="ui.action.Clean" text="Clean Changes" description="Clean Build Directory" icon="/icons/clean.png">
       <add-to-group group-id="RunnerActions" anchor="after" relative-to-action="Run"/>
     </action>
 

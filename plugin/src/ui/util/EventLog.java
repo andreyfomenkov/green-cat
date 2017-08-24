@@ -3,7 +3,7 @@ package ui.util;
 import com.intellij.notification.Notification;
 import com.intellij.notification.NotificationType;
 import com.intellij.notification.Notifications;
-import core.GreenCat;
+import ui.GreenCat;
 
 public class EventLog {
 

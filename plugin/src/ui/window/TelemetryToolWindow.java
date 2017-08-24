@@ -10,7 +10,7 @@ import javax.swing.*;
 
 public class TelemetryToolWindow {
 
-    private static final String WINDOW_ID = "GreenCat Telemetry";
+    private static final String WINDOW_ID = "ui.GreenCat Telemetry";
     private static final Runnable EMPTY_TASK = () -> {};
     private static TelemetryToolWindow instance;
     private ToolWindow window;
