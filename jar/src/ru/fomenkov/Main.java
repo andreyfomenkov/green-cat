@@ -34,7 +34,7 @@ public class Main {
     public static void main(String[] args) {
         Telemetry configTelemetry = new Telemetry();
         Configuration configLauncher = readLauncherConfiguration(configTelemetry);
-        Configuration configLocal = setupLocalConfiguration(configTelemetry);
+        //Configuration configLocal = setupLocalConfiguration(configTelemetry);
 
         if (configLauncher == null) {
             configTelemetry.warn("Reading launcher configuration failed");
@@ -42,11 +42,11 @@ public class Main {
             return;
         }
 
-        if (configLocal == null) {
-            configTelemetry.warn("Setting up local configuration failed");
-            configTelemetry.print();
-            return;
-        }
+//        if (configLocal == null) {
+//            configTelemetry.warn("Setting up local configuration failed");
+//            configTelemetry.print();
+//            return;
+//        }
 
         long startTime = System.nanoTime();
         LibraryInputReader reader = new LibraryInputReader(args);
@@ -143,10 +143,12 @@ public class Main {
         return configuration;
     }
 
-    private static Configuration setupLocalConfiguration(Telemetry telemetry) {
-        Configuration configuration = null;
-        return configuration;
-    }
+//    private static Configuration setupLocalConfiguration(Telemetry telemetry) {
+//        Configuration configuration;
+//
+//
+//        return configuration;
+//    }
 
     private static boolean makeDexAndDeploy(String androidSdkPath, File lambdaDir, File dexDir, String deployPath,
                                             String appPackage, String launcherActivity) {
