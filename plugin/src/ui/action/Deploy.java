@@ -134,10 +134,15 @@ public class Deploy extends ProjectAction {
         String line = output.get(output.size() - 1).toLowerCase();
 
         if (line.contains("terminated")) {
+            EventLog.warn("Deploying terminated");
             return DeployResult.TERMINATED;
+
         } else if (line.contains("failed")) {
+            EventLog.error("Deploying failed");
             return DeployResult.FAILED;
+
         } else {
+            EventLog.error("Deploying OK");
             return DeployResult.OK;
         }
     }
