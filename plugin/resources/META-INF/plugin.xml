@@ -6,15 +6,15 @@
 
   <!-- Description-->
   <description><![CDATA[
-      Custom instant run plugin for deploying incremental changes on devices Android 7.0 and higher.
-      This version has a set of constraints. For more details please check out source code:
-      <link rel="https://github.com/andreyfomenkov/green-cat" href="https://github.com/andreyfomenkov/green-cat">
+      Custom instant run plugin for deploying incremental changes on devices Android 7.0 and higher.<br>
+      This version has a set of constraints. For more details please check out source code:<br>
+      <a href="https://github.com/andreyfomenkov/green-cat">GreenCat project on GutHub</a>
     ]]></description>
 
   <!-- Changelog -->
   <change-notes><![CDATA[
-      Works with .java files only
-      Devices support with Android 7+
+      - Works with .java files only<br>
+      - Support devices with Android 7+
     ]]>
   </change-notes>
 
