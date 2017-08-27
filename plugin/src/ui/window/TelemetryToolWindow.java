@@ -4,8 +4,10 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.wm.ToolWindow;
 import com.intellij.openapi.wm.ToolWindowAnchor;
 import com.intellij.openapi.wm.ToolWindowManager;
+import com.intellij.ui.components.JBScrollPane;
 
 import javax.swing.*;
+import javax.swing.text.DefaultCaret;
 
 public class TelemetryToolWindow {
 
@@ -22,7 +24,10 @@ public class TelemetryToolWindow {
         if (window == null) {
             textPane = new JTextPane();
             textPane.setEditable(false);
-            JScrollPane scrollPane = new JScrollPane(textPane);
+
+            JBScrollPane scrollPane = new JBScrollPane(textPane);
+            DefaultCaret caret = (DefaultCaret) textPane.getCaret();
+            caret.setUpdatePolicy(DefaultCaret.ALWAYS_UPDATE);
 
             textPane.setContentType("text/html");
             initHtmlComposer();
@@ -44,9 +49,8 @@ public class TelemetryToolWindow {
         return instance;
     }
 
-    public TelemetryToolWindow clear() {
+    public void clear() {
         initHtmlComposer();
-        return this;
     }
 
     public void show() {
@@ -57,27 +61,27 @@ public class TelemetryToolWindow {
         window.hide(EMPTY_TASK);
     }
 
-    public TelemetryToolWindow message(String format, Object... args) {
+    public synchronized TelemetryToolWindow message(String format, Object... args) {
         composer.addLine(ReportMessageType.REGULAR, format, args);
-        textPane.setText(composer.compose());
         return this;
     }
 
-    public TelemetryToolWindow warn(String format, Object... args) {
+    public synchronized TelemetryToolWindow warn(String format, Object... args) {
         composer.addLine(ReportMessageType.WARNING, format, args);
-        textPane.setText(composer.compose());
         return this;
     }
 
-    public TelemetryToolWindow error(String format, Object... args) {
+    public synchronized TelemetryToolWindow error(String format, Object... args) {
         composer.addLine(ReportMessageType.ERROR, format, args);
-        textPane.setText(composer.compose());
         return this;
     }
 
-    public TelemetryToolWindow green(String format, Object... args) {
+    public synchronized TelemetryToolWindow green(String format, Object... args) {
         composer.addLine(ReportMessageType.GREEN, format, args);
-        textPane.setText(composer.compose());
         return this;
+    }
+
+    public synchronized void update() {
+        textPane.setText(composer.compose());
     }
 }

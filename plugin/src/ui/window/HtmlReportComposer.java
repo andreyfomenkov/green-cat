@@ -12,7 +12,7 @@ public class HtmlReportComposer {
     private static final String PAGE_BACKGROUND_COLOR = "#000000";
     private static final String PAGE_MARGIN = "7px";
     private static final String LINE_BOTTOM_PADDING = "0px";
-    private static final String FONT_SIZE = "3";
+    private static final String FONT_SIZE = "4";
     private static final String FONT_TYPE = "monospace";
     private final Document doc;
 
