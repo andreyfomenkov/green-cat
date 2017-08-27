@@ -5,6 +5,7 @@ import java.io.File;
 public class GreenCat {
 
     public static final String PROPERTIES_FILE = "greencat.properties";
+    public static final String LAUNCHER_FILE = "greencat.launcher";
     private static final String BUILD_PATH = "/build/greencat";
     private static final String LAMBDA_PATH = BUILD_PATH + "/lambda";
     private static final String DEX_BUILD_PATH = BUILD_PATH + "/dex";

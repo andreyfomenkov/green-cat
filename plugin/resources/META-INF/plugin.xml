@@ -6,14 +6,15 @@
 
   <!-- Description-->
   <description><![CDATA[
-      Enter short description for your plugin here.<br>
-      <em>most HTML tags may be used</em>
+      Custom instant run plugin for deploying incremental changes on devices Android 7.0 and higher.
+      This version has a set of constraints. For more details please check out source code:
+      <link rel="https://github.com/andreyfomenkov/green-cat" href="https://github.com/andreyfomenkov/green-cat">
     ]]></description>
 
   <!-- Changelog -->
   <change-notes><![CDATA[
-      Add change notes here.<br>
-      <em>most HTML tags may be used</em>
+      Works with .java files only
+      Devices support with Android 7+
     ]]>
   </change-notes>
 

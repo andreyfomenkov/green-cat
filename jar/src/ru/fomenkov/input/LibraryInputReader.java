@@ -17,8 +17,6 @@ public class LibraryInputReader {
         requiredArguments.add(Argument.PROJECT_MODULES);
         requiredArguments.add(Argument.CLASSPATH);
         requiredArguments.add(Argument.ANDROID_SDK_PATH);
-        requiredArguments.add(Argument.PACKAGE);
-        requiredArguments.add(Argument.MAIN_ACTIVITY);
     }
 
     public LibraryInput read() throws MissedArgumentsException {
@@ -37,12 +35,6 @@ public class LibraryInputReader {
 
             } else if (Argument.ANDROID_SDK_PATH.value().equals(arg)) {
                 nextArg = Argument.ANDROID_SDK_PATH;
-
-            } else if (Argument.PACKAGE.value().equals(arg)) {
-                nextArg = Argument.PACKAGE;
-
-            } else if (Argument.MAIN_ACTIVITY.value().equals(arg)) {
-                nextArg = Argument.MAIN_ACTIVITY;
             } else {
                 if (nextArg == null) {
                     Log.e("Invalid argument found: %s", arg);
@@ -61,12 +53,6 @@ public class LibraryInputReader {
                             break;
                         case ANDROID_SDK_PATH:
                             input.setAndroidSdkPath(arg);
-                            break;
-                        case PACKAGE:
-                            input.setPackageName(arg);
-                            break;
-                        case MAIN_ACTIVITY:
-                            input.setMainActivity(arg);
                             break;
                     }
                     nextArg = null;

@@ -5,9 +5,7 @@ public enum Argument {
     PROJECT_PATH("-d"),
     PROJECT_MODULES("-m"),
     CLASSPATH("-cp"),
-    ANDROID_SDK_PATH("-sdk"),
-    PACKAGE("-p"),
-    MAIN_ACTIVITY("-a");
+    ANDROID_SDK_PATH("-sdk");
 
     private final String value;
 

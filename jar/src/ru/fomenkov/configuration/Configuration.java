@@ -4,6 +4,7 @@ import com.sun.istack.internal.NotNull;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 public class Configuration {
 
@@ -22,14 +23,7 @@ public class Configuration {
         properties.remove(property);
     }
 
-    public String toString() {
-        StringBuilder builder = new StringBuilder("Properties list:\n");
-
-        for (Property property : properties.keySet()) {
-            String value = properties.get(property);
-            builder.append(property).append(" = ").append(value).append("\n");
-        }
-
-        return builder.toString();
+    public Set<Property> getProperties() {
+        return properties.keySet();
     }
 }

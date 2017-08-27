@@ -9,5 +9,6 @@ jar/.idea/workspace.xml
 jar/.idea/tasks.xml
 jar/.idea/*.iws
 jar/*.zip
+jar/greencat.properties
 
 .idea

@@ -3,7 +3,6 @@ package ru.fomenkov;
 import ru.fomenkov.command.CommandExecutor;
 import ru.fomenkov.configuration.Configuration;
 import ru.fomenkov.configuration.ConfigurationReader;
-import ru.fomenkov.configuration.ConfigurationWriter;
 import ru.fomenkov.configuration.Property;
 import ru.fomenkov.exception.ConfigurationParsingException;
 import ru.fomenkov.exception.MissedArgumentsException;
@@ -33,23 +32,20 @@ import java.util.concurrent.Executors;
 public class Main {
 
     public static void main(String[] args) {
+        Telemetry configTelemetry = new Telemetry();
+        Configuration configLauncher = readLauncherConfiguration(configTelemetry);
+        Configuration configLocal = setupLocalConfiguration(configTelemetry);
 
-        Configuration conf = new Configuration();
-        conf.set(Property.ADB_TOOL_PATH, "/path/to/adb");
-        conf.set(Property.JAVAC_BIN_PATH, "/path/to/javac");
-        conf.set(Property.RETROLAMBDA_JAR_PATH, "/path/to/lambda");
+        if (configLauncher == null) {
+            configTelemetry.warn("Reading launcher configuration failed");
+            configTelemetry.print();
+            return;
+        }
 
-        ConfigurationWriter writer = new ConfigurationWriter(GreenCat.PROPERTIES_FILE);
-        writer.write(conf);
-
-        ConfigurationReader rd = new ConfigurationReader(GreenCat.PROPERTIES_FILE);
-        Configuration configuration;
-
-        try {
-            configuration = rd.read();
-            System.out.println(configuration);
-        } catch (IOException | ConfigurationParsingException e) {
-            e.printStackTrace();
+        if (configLocal == null) {
+            configTelemetry.warn("Setting up local configuration failed");
+            configTelemetry.print();
+            return;
         }
 
         long startTime = System.nanoTime();
@@ -109,8 +105,8 @@ public class Main {
         String androidSdkPath = input.getAndroidSdkPath();
         File lambdaDir = GreenCat.getLambdaDir(projectPath);
         File dexDir = GreenCat.getDexBuildDir(projectPath);
-        String packageName = input.getPackageName();
-        String mainActivity = input.getMainActivity();
+        String packageName = configLauncher.get(Property.PACKAGE, "");
+        String mainActivity = configLauncher.get(Property.LAUNCHER_ACTIVITY, "");
         String deployPath = GreenCat.getDexDeployPath();
 
         if (!makeDexAndDeploy(androidSdkPath, lambdaDir, dexDir, deployPath, packageName, mainActivity)) {
@@ -122,6 +118,34 @@ public class Main {
         long endTime = System.nanoTime();
         buildTelemetry.message("DEPLOYMENT COMPLETE IN %s SEC", Utils.formatNanoTimeToSeconds(endTime - startTime));
         buildTelemetry.print();
+    }
+
+    private static Configuration readLauncherConfiguration(Telemetry telemetry) {
+        ConfigurationReader reader = new ConfigurationReader(GreenCat.PROPERTIES_FILE);
+        Configuration configuration;
+
+        try {
+            configuration = reader.read();
+        } catch (IOException | ConfigurationParsingException e) {
+            e.printStackTrace();
+            telemetry.error("Error reading %s file: %s", GreenCat.PROPERTIES_FILE, e.getMessage());
+            return null;
+        }
+
+        if (configuration.get(Property.PACKAGE, "").isEmpty()) {
+            telemetry.error("Property %s is not set", Property.PACKAGE);
+            return null;
+
+        } else if (configuration.get(Property.LAUNCHER_ACTIVITY, "").isEmpty()) {
+            telemetry.error("Property %s is not set", Property.LAUNCHER_ACTIVITY);
+            return null;
+        }
+        return configuration;
+    }
+
+    private static Configuration setupLocalConfiguration(Telemetry telemetry) {
+        Configuration configuration = null;
+        return configuration;
     }
 
     private static boolean makeDexAndDeploy(String androidSdkPath, File lambdaDir, File dexDir, String deployPath,

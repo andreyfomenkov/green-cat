@@ -81,8 +81,6 @@ public class Deploy extends ProjectAction {
         String modules = composeModulesArgument(project);
         String classpath = composeClasspathArgument(context);
         String androidSdkPath = Utils.getAndroidSdkPath(project);
-        String appPackage = "com.agoda.mobile.consumer.debug"; // TODO: read from launch.properties
-        String launcherActivity = "com.agoda.mobile.consumer.screens.splash.AppLauncherActivity"; // TODO: read from launch.properties
 
         window.message("Deployment in progress...");
         window.message(" ");
@@ -92,7 +90,7 @@ public class Deploy extends ProjectAction {
 
             @Override
             public DetailedDeployReport onBackground() {
-                DeployResult result = executeJar(window, projectPath, modules, classpath, androidSdkPath, appPackage, launcherActivity);
+                DeployResult result = executeJar(window, projectPath, modules, classpath, androidSdkPath);
                 return new DetailedDeployReport(result, ImmutableList.of());
             }
 
@@ -118,7 +116,7 @@ public class Deploy extends ProjectAction {
     }
 
     private DeployResult executeJar(TelemetryToolWindow window, String projectPath, String modules, String classpath,
-                            String androidSdkPath, String appPackage, String launcherActivity) {
+                            String androidSdkPath) {
         String jarPath = projectPath + GreenCat.GREENCAT_JAR_PATH;
         String cmd = CommandLineBuilder.create("java -jar")
                 .add(new Parameter(jarPath))
@@ -126,8 +124,6 @@ public class Deploy extends ProjectAction {
                 .add(new Parameter("-m", modules))
                 .add(new Parameter("-cp", classpath))
                 .add(new Parameter("-sdk", androidSdkPath))
-                .add(new Parameter("-p", appPackage))
-                .add(new Parameter("-a", launcherActivity))
                 .build();
 
         List<String> output = CommandExecutor.execOnInputStream(window, cmd);
