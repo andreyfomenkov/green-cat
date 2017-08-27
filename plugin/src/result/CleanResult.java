@@ -1,6 +1,7 @@
 package result;
 
 public enum CleanResult {
+
     OK("Cleanup complete"),
     NO_DEVICES_CONNECTED("No devices/emulators connected"),
     MULTIPLE_DEVICES_CONNECTED("Multiple devices/emulators found"),

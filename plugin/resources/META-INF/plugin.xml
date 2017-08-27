@@ -1,8 +1,8 @@
 <idea-plugin version="2">
   <id>ru.fomenkov.idea.greencat</id>
-  <name>ui.GreenCat</name>
+  <name>GreenCat</name>
   <version>1.0</version>
-  <vendor email="droideka@mail.ru" url="https://www.linkedin.com/in/andrey-fomenkov-8866a863/">Andrey Fomenkov</vendor>
+  <vendor email="droideka@mail.ru">Andrey Fomenkov</vendor>
 
   <!-- Description-->
   <description><![CDATA[

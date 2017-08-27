@@ -56,7 +56,7 @@ public class Clean extends ProjectAction {
                         .add(new Parameter("rm -rf", GreenCat.SDCARD_DEPLOY_PATH))
                         .build();
 
-                List<String> output = CommandExecutor.execOnErrorStream(cmd);
+                List<String> output = CommandExecutor.execOnErrorStream(window, cmd);
                 CleanResult result;
 
                 if (output.size() == 0) {
@@ -85,6 +85,8 @@ public class Clean extends ProjectAction {
                     window.error(report.result.message);
                     EventLog.error(report.result.message);
                 }
+
+                window.update();
                 setActionEnabled(true);
             }
         }.start();

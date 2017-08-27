@@ -1,6 +1,11 @@
 package ru.fomenkov;
 
 import ru.fomenkov.command.CommandExecutor;
+import ru.fomenkov.configuration.Configuration;
+import ru.fomenkov.configuration.ConfigurationReader;
+import ru.fomenkov.configuration.ConfigurationWriter;
+import ru.fomenkov.configuration.Property;
+import ru.fomenkov.exception.ConfigurationParsingException;
 import ru.fomenkov.exception.MissedArgumentsException;
 import ru.fomenkov.input.LibraryInput;
 import ru.fomenkov.input.LibraryInputReader;
@@ -19,6 +24,7 @@ import ru.fomenkov.util.Log;
 import ru.fomenkov.util.Utils;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -27,6 +33,25 @@ import java.util.concurrent.Executors;
 public class Main {
 
     public static void main(String[] args) {
+
+        Configuration conf = new Configuration();
+        conf.set(Property.ADB_TOOL_PATH, "/path/to/adb");
+        conf.set(Property.JAVAC_BIN_PATH, "/path/to/javac");
+        conf.set(Property.RETROLAMBDA_JAR_PATH, "/path/to/lambda");
+
+        ConfigurationWriter writer = new ConfigurationWriter(GreenCat.PROPERTIES_FILE);
+        writer.write(conf);
+
+        ConfigurationReader rd = new ConfigurationReader(GreenCat.PROPERTIES_FILE);
+        Configuration configuration;
+
+        try {
+            configuration = rd.read();
+            System.out.println(configuration);
+        } catch (IOException | ConfigurationParsingException e) {
+            e.printStackTrace();
+        }
+
         long startTime = System.nanoTime();
         LibraryInputReader reader = new LibraryInputReader(args);
         LibraryInput input;
