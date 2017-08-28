@@ -32,8 +32,18 @@ import java.util.concurrent.Executors;
 public class Main {
 
     public static void main(String[] args) {
+        long startTime = System.nanoTime();
+        LibraryInputReader reader = new LibraryInputReader(args);
+        LibraryInput input;
+
+        try {
+            input = reader.read();
+        } catch (MissedArgumentsException ignore) {
+            return;
+        }
+
         Telemetry configTelemetry = new Telemetry();
-        Configuration configLauncher = readLauncherConfiguration(configTelemetry);
+        Configuration configLauncher = readLauncherConfiguration(configTelemetry, input.getProjectPath());
         //Configuration configLocal = setupLocalConfiguration(configTelemetry);
 
         if (configLauncher == null) {
@@ -47,16 +57,6 @@ public class Main {
 //            configTelemetry.print();
 //            return;
 //        }
-
-        long startTime = System.nanoTime();
-        LibraryInputReader reader = new LibraryInputReader(args);
-        LibraryInput input;
-
-        try {
-            input = reader.read();
-        } catch (MissedArgumentsException ignore) {
-            return;
-        }
 
         String projectPath = input.getProjectPath();
         Telemetry resolveTelemetry = new Telemetry();
@@ -120,15 +120,15 @@ public class Main {
         buildTelemetry.print();
     }
 
-    private static Configuration readLauncherConfiguration(Telemetry telemetry) {
-        ConfigurationReader reader = new ConfigurationReader(GreenCat.LAUNCHER_FILE);
+    private static Configuration readLauncherConfiguration(Telemetry telemetry, String projectPath) {
+        ConfigurationReader reader = new ConfigurationReader(projectPath + GreenCat.LAUNCHER_FILE);
         Configuration configuration;
 
         try {
             configuration = reader.read();
         } catch (IOException | ConfigurationParsingException e) {
             e.printStackTrace();
-            telemetry.error("Error reading %s file: %s", GreenCat.PROPERTIES_FILE, e.getMessage());
+            telemetry.error("Error reading %s file: %s", projectPath + GreenCat.LAUNCHER_FILE, e.getMessage());
             return null;
         }
 

@@ -31,6 +31,12 @@ public class IncrementalBuild {
         this.diff = diff;
     }
 
+
+    private String getGeneratedRFilePath(Module module) {
+        String path = String.format("%s/build/generated/source/r/%s", module.modulePath, module.variant);
+        return new File(path).exists() ? path : "";
+    }
+
     public Result submit() {
         Result submitResult = new Result();
         Telemetry moduleReport = new Telemetry();
@@ -38,9 +44,10 @@ public class IncrementalBuild {
         ModuleDiffMessage message = new ModuleDiffMessage(module, files);
         File compileDir = GreenCat.getCompileDir(projectPath, module.name);
         File lambdaDir = GreenCat.getLambdaDir(projectPath);
+        String rFilePath = getGeneratedRFilePath(module);
 
         TaskExecutor.Result result = TaskExecutor.create(message, moduleReport)
-                .add(new CompileWithJavacTask(projectPath, classpath, compileDir))
+                .add(new CompileWithJavacTask(projectPath, rFilePath.isEmpty() ? classpath : rFilePath + ":" + classpath, compileDir))
                 .add(new RetrolambdaTask(compileDir.getAbsolutePath(), lambdaDir.getAbsolutePath()))
                 .execute();
 

@@ -129,21 +129,17 @@ public class Deploy extends ProjectAction {
         List<String> output = CommandExecutor.execOnInputStream(window, cmd);
 
         if (output.size() == 0) {
-            EventLog.error("Plugin internal error");
             return DeployResult.FAILED;
         } else {
             String line = output.get(output.size() - 1).toLowerCase();
 
             if (line.contains("terminated")) {
-                EventLog.warn("Deploying terminated");
                 return DeployResult.TERMINATED;
 
             } else if (line.contains("failed")) {
-                EventLog.error("Deploying failed");
                 return DeployResult.FAILED;
 
             } else {
-                EventLog.error("Deploying OK");
                 return DeployResult.OK;
             }
         }
