@@ -121,7 +121,7 @@ public class Main {
     }
 
     private static Configuration readLauncherConfiguration(Telemetry telemetry) {
-        ConfigurationReader reader = new ConfigurationReader(GreenCat.PROPERTIES_FILE);
+        ConfigurationReader reader = new ConfigurationReader(GreenCat.LAUNCHER_FILE);
         Configuration configuration;
 
         try {
