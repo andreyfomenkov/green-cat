@@ -38,9 +38,9 @@ Plugin setup
 1. Download the latest *greencat-plugin.zip* from repository
 2. In IDE: File -> Settings -> Plugins -> Install plugin from disk...
 3. Restart IDE
-4. You should see two additional buttons in your toolbar near Run button:</br>
-*Deploy:* ![Deploy](https://github.com/andreyfomenkov/green-cat/blob/master/plugin/resources/icons/deploy.png)</br>
-*Clean:* ![Clean](https://github.com/andreyfomenkov/green-cat/blob/master/plugin/resources/icons/clean.png)
+4. You should see two additional buttons in your toolbar near Run button:
+ **Deploy:** ![Deploy](https://github.com/andreyfomenkov/green-cat/blob/master/plugin/resources/icons/deploy.png)
+ **Clean:** ![Clean](https://github.com/andreyfomenkov/green-cat/blob/master/plugin/resources/icons/clean.png)
 
 **For git-based project**
 1. Download the latest *greencat.jar* and put into <PROJECT_DIR>/greencat
