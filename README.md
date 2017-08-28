@@ -3,10 +3,9 @@ Green Cat
 
 Experimental Instant Run plugin for Android Studio.
 
-The plugin can be used when [Google's Instant Run](https://developer.android.com/studio/run/index.html#instant-run) is too slow to be instant or stops working at all.
+The plugin can be used when [Google's Instant Run](https://developer.android.com/studio/run/index.html#instant-run) is too slow to be instant or stops working at all. Don't consider GreenCat as a full-replacement build tool for your apps, because it has a pretty narrow area of usage.
 
-This version has a set of constraints and still not tested well.
-
+Check out the list of features supported or to be done:
 
 License
 -------
