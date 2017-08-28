@@ -1,10 +1,12 @@
 Green Cat
 =========
 
-Instant run plugin for Android Studio + code injector library.
-Project is currently under construction. Detailed developer's guide and information will be provided later.
+Experimental Instant Run plugin for Android Studio.
 
-To be continued...
+The plugin can be used when [Google's Instant Run](https://developer.android.com/studio/run/index.html#instant-run) is too slow to be instant or stops working at all.
+
+This version has a set of constraints and still not tested well.
+
 
 License
 -------
