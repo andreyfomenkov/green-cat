@@ -19,13 +19,13 @@ Features list
 
 Check out the list of features supported or to be done:
 - [x] Incremental build for .java files
+- [x] Devices support with Android 5.x and 6.x
 - [x] Devices support with Android 7+
 - [x] Supporting Android Studio projects with [Retrolambda](https://github.com/orfjackal/retrolambda) bytecode transformer inside
 - [ ] Supporting Android Studio projects with [Desugar](https://developer.android.com/studio/write/java8-support.html) bytecode transformer inside
 - [ ] Supporting Android Studio projects with [Kotlin](https://kotlinlang.org) language
 - [ ] Annotation processing
 - [ ] Incremental build for XML resources (layouts, strings, dimens, etc.)
-- [ ] Devices support with Android 5.x and 6.x
 
 Description
 -----------
@@ -68,6 +68,7 @@ LAUNCHER_ACTIVITY=com.your.project.package.StartupActivity
 <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
 ```
 2. Add DEX injection code :warning: Read **Potential security risks** section first :warning:</br>
+
 **For Android 5.x and 6.x:**
 ```java
 private boolean injectForAndroidLollipop() {
