@@ -45,7 +45,7 @@ JAR library consumes 2 property files:
 Plugin setup
 ------------
 **For Android Studio**
-1. Download the latest *artifacts/greencat-plugin.zip* from repository
+1. Download the latest *artifacts/**LATEST_VERSION**/plugin.zip* from repository
 2. In IDE: File -> Settings -> Plugins -> Install plugin from disk...
 3. Restart IDE
 4. You should see two additional buttons in your toolbar near Run button:
@@ -53,7 +53,7 @@ Plugin setup
  **Clean:** ![Clean](https://github.com/andreyfomenkov/green-cat/blob/master/plugin/resources/icons/clean.png)
 
 **For git-based project**
-1. Download the latest *artifacts/greencat.jar* and put into <PROJECT_DIR>/greencat
+1. Download the latest *artifacts/**LATEST_VERSION**/greencat.jar* and put into <PROJECT_DIR>/greencat
 2. Add the next line to .gitignore: greencat/greencat.properties (this file will be generated only for you)
 3. Create configuration file *greencat.launcher* inside <PROJECT_DIR>/greencat
 4. Add the next lines with your appropriate values into <PROJECT_DIR>/greencat/greencat.launcher</br>
