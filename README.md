@@ -67,9 +67,40 @@ LAUNCHER_ACTIVITY=com.your.project.package.StartupActivity
 ```xml
 <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
 ```
-2. Add DEX injection code :warning: Read **Potential security risks** section first :warning:
+2. Add DEX injection code :warning: Read **Potential security risks** section first :warning:</br>
+**For Android 5.x and 6.x:**
 ```java
-private boolean inject(PathClassLoader classLoader) {
+private boolean injectForAndroidLollipop() {
+    try {
+        Field field = BaseDexClassLoader.class.getDeclaredField("pathList");
+        field.setAccessible(true);
+        final Object pathList = field.get(classLoader);
+        field = pathList.getClass().getDeclaredField("dexElements");
+        field.setAccessible(true);
+
+        final Class<?> elementClass = Class.forName("dalvik.system.DexPathList$Element");
+        final Constructor<?> elementConstructor = elementClass.getConstructor(File.class, boolean.class, File.class, DexFile.class);
+        final Object[] dexElements = (Object[]) field.get(pathList);
+        final Object apk = dexElements[0];
+        final Object dex = elementConstructor.newInstance(null, false, null, new DexFile(DEX_FILE_PATH));
+        final Object myArray = Array.newInstance(field.getType().getComponentType(), 2);
+        
+        Array.set(myArray, 0, dex);
+        Array.set(myArray, 1, apk);
+        field.set(pathList, myArray);
+        log.d("DEX file successfully loaded");
+        return true;
+
+    } catch (final Exception e) {
+        log.e(e, "Failed to load DEX file");
+        return false;
+    }
+}
+```
+
+**For Android 7.0 and higher:**
+```java
+private boolean injectForAndroidNougat(PathClassLoader classLoader) {
     try {
         Field field = BaseDexClassLoader.class.getDeclaredField("pathList");
         field.setAccessible(true);
@@ -110,7 +141,6 @@ protected void attachBaseContext(final Context base) {
     }
 }
 ```
-
 
 3. Before running Android application with incremental changes please make sure that application has permissions to read from external storage. For Android 6+ read about [runtime permissions](https://developer.android.com/training/permissions/requesting.html).
 
