@@ -128,6 +128,12 @@ public class Deploy extends ProjectAction {
 
         List<String> output = CommandExecutor.execOnInputStream(window, cmd);
 
+        for (String line : output) {
+            window.message(line);
+        }
+
+        window.update();
+
         if (output.size() == 0) {
             return DeployResult.FAILED;
         } else {

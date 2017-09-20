@@ -6,14 +6,16 @@
 
   <!-- Description-->
   <description><![CDATA[
-      Custom instant run plugin for deploying incremental changes on devices Android 7.0 and higher.<br>
+      Custom instant run plugin for deploying incremental changes on devices with Android 5.0 and higher.<br>
       This version has a set of constraints. For more details please check out source code:<br>
       <a href="https://github.com/andreyfomenkov/green-cat">GreenCat project on GutHub</a>
     ]]></description>
 
   <!-- Changelog -->
   <change-notes><![CDATA[
-      - Works with .java files only<br>
+      - Supported Android Studio projects based on Retrolambda<br>
+      - Source .java files compiling and deploying<br>
+      - Support devices with Android 5.0 and 6.0<br>
       - Support devices with Android 7+
     ]]>
   </change-notes>
