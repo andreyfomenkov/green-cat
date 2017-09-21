@@ -1,6 +1,7 @@
 package ru.fomenkov;
 
 import ru.fomenkov.command.CommandExecutor;
+import ru.fomenkov.command.CommandLineBuilder;
 import ru.fomenkov.configuration.Configuration;
 import ru.fomenkov.configuration.ConfigurationReader;
 import ru.fomenkov.configuration.Property;
@@ -89,6 +90,7 @@ public class Main {
 
         resolveTelemetry.print();
         Telemetry buildTelemetry = new Telemetry();
+        printJdkInfo(buildTelemetry);
 
         if (!doIncrementalBuild(input, diff)) {
             buildTelemetry.error("COMPILATION FAILED");
@@ -118,6 +120,25 @@ public class Main {
         long endTime = System.nanoTime();
         buildTelemetry.message("DEPLOYMENT COMPLETE IN %s SEC", Utils.formatNanoTimeToSeconds(endTime - startTime));
         buildTelemetry.print();
+    }
+
+    private static void printJdkInfo(Telemetry telemetry) {
+        String cmd = CommandLineBuilder.create("java -version").build();
+        List<String> output = CommandExecutor.execOnErrorStream(cmd);
+        telemetry.message("java -version");
+
+        for (String line : output) {
+            telemetry.message(line);
+        }
+
+        telemetry.message(" ");
+        telemetry.message("javac -version");
+        cmd = CommandLineBuilder.create("javac -version").build();
+        output = CommandExecutor.execOnErrorStream(cmd);
+
+        for (String line : output) {
+            telemetry.message(line);
+        }
     }
 
     private static Configuration readLauncherConfiguration(Telemetry telemetry, String projectPath) {
@@ -221,6 +242,7 @@ public class Main {
 
                 if (result.status == ExecutionStatus.SUCCESS) {
                     buildReport.message("Building complete for module [%s]", module.name);
+                    failedReports.add(result.telemetry); // REMOVE
 
                 } else if (result.status == ExecutionStatus.TERMINATED) {
                     buildReport.message("Building terminated for module [%s]", module.name);
@@ -246,7 +268,7 @@ public class Main {
             for (Telemetry telemetry : failedReports) {
                 telemetry.print();
             }
-            success = false;
+            //success = false;
         }
 
         service.shutdown();

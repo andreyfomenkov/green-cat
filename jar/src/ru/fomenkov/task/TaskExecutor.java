@@ -62,7 +62,16 @@ public class TaskExecutor {
                 TaskPurpose purpose = task.getPurpose();
                 telemetry.green("");
                 telemetry.green("[STEP %d/%d] %s: %s", i + 1, size, purpose, purpose.value());
+
+                long start = System.currentTimeMillis();
                 message = task.exec(telemetry, message);
+                long delay = System.currentTimeMillis() - start;
+
+                if (delay < 1000) {
+                    telemetry.message("TOOK %d ms", delay);
+                } else {
+                    telemetry.message("TOOK %d s", delay / 1000);
+                }
 
                 if (message.status == ExecutionStatus.ERROR) {
                     telemetry.error("");

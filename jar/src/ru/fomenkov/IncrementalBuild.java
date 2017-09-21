@@ -31,7 +31,6 @@ public class IncrementalBuild {
         this.diff = diff;
     }
 
-
     private String getGeneratedRFilePath(Module module) {
         String path = String.format("%s/build/generated/source/r/%s", module.modulePath, module.variant);
         return new File(path).exists() ? path : "";
