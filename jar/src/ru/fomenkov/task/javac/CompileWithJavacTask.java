@@ -42,13 +42,8 @@ public class CompileWithJavacTask implements Task<ModuleDiffMessage, CompileWith
             throw new IllegalArgumentException("No files to compile from the previous step");
         }
 
-        telemetry.message("Copy project .class files...");
-
-        if (copyClassFiles(telemetry, projectPath, message.getModule())) {
-            telemetry.message("Copying complete");
-        } else {
-            telemetry.error("Failed to copy");
-            return new CompileWithJavacMessage(ExecutionStatus.ERROR, "Failed to copy project .class files");
+        if (!createCompileDir(projectPath, message.getModule())) {
+            return new CompileWithJavacMessage(ExecutionStatus.ERROR, "Failed to create module directory");
         }
 
         telemetry.message("Compiling with javac...");
@@ -60,29 +55,10 @@ public class CompileWithJavacTask implements Task<ModuleDiffMessage, CompileWith
         }
     }
 
-    private boolean copyClassFiles(Telemetry telemetry, String projectPath, Module module) {
-        if (!objDir.exists() && !objDir.mkdirs()) {
-            telemetry.error("Failed to create directory for classes: %s", objDir.getPath());
-            return false;
-        }
-
-        String srcPath = module.buildPath + "/.";
+    private boolean createCompileDir(String projectPath, Module module) {
         String dstPath = GreenCat.getCompileDir(projectPath, module.name).getAbsolutePath();
-
-        telemetry.message("Copying .class files...");
-        telemetry.message("From: %s", srcPath);
-        telemetry.message("To:   %s", dstPath);
-
-        String cmd = CommandLineBuilder.create("cp -r")
-                .add(new Parameter(srcPath))
-                .add(new Parameter(dstPath))
-                .build();
-
-        List<String> output = CommandExecutor.execOnInputStream(cmd);
-        for (String line : output) {
-            telemetry.message(line);
-        }
-        return true;
+        File dstDir = new File(dstPath);
+        return dstDir.exists() || dstDir.mkdirs();
     }
 
     private boolean compileWithJavac(Telemetry telemetry, Set<File> javaFiles, String classpath) {
