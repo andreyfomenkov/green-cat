@@ -23,9 +23,9 @@ Check out the list of features supported or to be done:
 - [ ] Annotation processing on demand
 - [x] Devices support with Android 5.x and 6.x
 - [x] Devices support with Android 7+
-- [x] Supporting Android Studio projects with [Retrolambda](https://github.com/orfjackal/retrolambda) bytecode transformer inside
-- [ ] Supporting Android Studio projects with [Desugar](https://developer.android.com/studio/write/java8-support.html) bytecode transformer inside
-- [ ] Supporting Android Studio projects with [Kotlin](https://kotlinlang.org) language
+- [x] Supporting Android Studio projects with [Retrolambda](https://github.com/orfjackal/retrolambda)
+- [ ] Supporting Android Studio projects with [Desugar](https://developer.android.com/studio/write/java8-support.html)
+- [ ] Supporting Android Studio projects with [Kotlin](https://kotlinlang.org)
 - [ ] Incremental build for XML resources (layouts, strings, dimens, etc.)
 
 Description
