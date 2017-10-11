@@ -20,12 +20,12 @@ Features list
 Check out the list of features supported or to be done:
 - [x] Incremental build for existing java code changes
 - [ ] Incremental build for big structural code changes
+- [ ] Annotation processing on demand
 - [x] Devices support with Android 5.x and 6.x
 - [x] Devices support with Android 7+
 - [x] Supporting Android Studio projects with [Retrolambda](https://github.com/orfjackal/retrolambda) bytecode transformer inside
 - [ ] Supporting Android Studio projects with [Desugar](https://developer.android.com/studio/write/java8-support.html) bytecode transformer inside
 - [ ] Supporting Android Studio projects with [Kotlin](https://kotlinlang.org) language
-- [ ] Annotation processing
 - [ ] Incremental build for XML resources (layouts, strings, dimens, etc.)
 
 Description
