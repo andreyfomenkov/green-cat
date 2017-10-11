@@ -9,7 +9,7 @@ Please refer to **Known issues** section below.
 
 Whetting your appetite
 ----------------------
-The diagram below shows up regular vs incremental build timings for a typical huge multidex Android project. Note that GreenCat doesn't require to upload and deploy big debug APK file, instead, it pushes small DEX file with incremental changes on SDCard and deploy them with you Android app.
+The diagram below shows up regular vs incremental build timings for a typical huge multidex Android project (of course build times can vary). Note that GreenCat doesn't require to upload and deploy big debug APK file, instead, it pushes small DEX file with incremental changes on SDCard and deploy them with you Android app.
 <p align="center">
   <img src="https://github.com/andreyfomenkov/green-cat/blob/master/images/build-time-diagram.png">
 </p>
