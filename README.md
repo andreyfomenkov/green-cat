@@ -153,7 +153,7 @@ Potential security risks :warning:
 Known issues
 ------------
 
-As mentioned before you should build & run your project on Android device prior to start using GreenCat plugin. Compiling and dexing structural code changes, like adding **public** members, works fine, but trying to deploy them may cause runtime errors. Such kind of changes require compile not for a particuar class but for the whole module. So, use this plugin only for testing and debugging small pieces of code very fast.
+As mentioned before you should build & run your project on Android device prior to start using GreenCat plugin. Compiling and dexing structural code changes, like adding **public** members, works fine, but trying to deploy them may cause runtime errors. Such kind of changes require compile not for a particuar class but for the whole module. So, use this plugin only for testing and debugging small pieces of code.
 
 License
 -------
