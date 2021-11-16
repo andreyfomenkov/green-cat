@@ -1,14 +1,15 @@
-plugin/out
-plugin/.idea/workspace.xml
-plugin/.idea/tasks.xml
-plugin/.idea/*.iws
-plugin/*.zip
+injector/out
+injector/.idea/workspace.xml
+injector/.idea/tasks.xml
+injector/.idea/*.iws
+injector/*.zip
 
-jar/out
-jar/.idea/workspace.xml
-jar/.idea/tasks.xml
-jar/.idea/*.iws
-jar/*.zip
-jar/greencat.properties
+tool/out
+tool/.idea/workspace.xml
+tool/.idea/tasks.xml
+tool/.idea/*.iws
+tool/*.zip
+tool/greencat.properties
 
+.DS_Store
 .idea
