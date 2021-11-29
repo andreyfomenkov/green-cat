@@ -39,17 +39,18 @@ public class Main {
 
         try {
             input = reader.read();
-        } catch (MissedArgumentsException ignore) {
-
+        } catch (MissedArgumentsException error) {
+            Telemetry.err("Failed to read arguments: %s", error.getMessage());
             return;
         }
-        Configuration configLauncher = readLauncherConfiguration(input.getProjectPath());
+        Configuration config = readConfigFile();
 
-        if (configLauncher == null) {
-            Telemetry.err("Reading launcher configuration failed");
+        if (config == null) {
+            Telemetry.err("Failed to read configuration file");
             return;
         }
         String projectPath = input.getProjectPath();
+        Telemetry.log("===================================================");
         Telemetry.log("GreenCat v" + GreenCat.VERSION);
         Telemetry.log("GitHub: https://github.com/andreyfomenkov/green-cat");
         Telemetry.log("===================================================");
@@ -60,6 +61,7 @@ public class Main {
         try {
             GitDiffMessage message = (GitDiffMessage) result.message;
             diff = message.getFiles();
+
         } catch (ClassCastException e) {
             Log.e("Unexpected message type: %s", result.message);
             e.printStackTrace();
@@ -85,8 +87,8 @@ public class Main {
         }
         String androidSdkPath = input.getAndroidSdkPath();
         File dexDir = GreenCat.getDexBuildDir(projectPath);
-        String packageName = configLauncher.get(Property.PACKAGE, "");
-        String mainActivity = configLauncher.get(Property.LAUNCHER_ACTIVITY, "");
+        String packageName = config.get(Property.PACKAGE);
+        String mainActivity = config.get(Property.LAUNCHER_ACTIVITY);
         String deployPath = GreenCat.getDexDeployPath();
 
         if (!makeDexAndDeploy(androidSdkPath, dexDir, deployPath, packageName, mainActivity)) {
@@ -116,23 +118,23 @@ public class Main {
         }
     }
 
-    private static Configuration readLauncherConfiguration(String projectPath) {
-        ConfigurationReader reader = new ConfigurationReader(GreenCat.LAUNCHER_FILE);
+    private static Configuration readConfigFile() {
+        ConfigurationReader reader = new ConfigurationReader(GreenCat.CONFIG_FILE);
         Configuration configuration;
 
         try {
             configuration = reader.read();
         } catch (IOException | ConfigurationParsingException e) {
             e.printStackTrace();
-            Telemetry.err("Error reading %s file: %s", GreenCat.LAUNCHER_FILE, e.getMessage());
+            Telemetry.err("Error reading %s file: %s", GreenCat.CONFIG_FILE, e.getMessage());
             return null;
         }
 
-        if (configuration.get(Property.PACKAGE, "").isEmpty()) {
+        if (configuration.get(Property.PACKAGE).isEmpty()) {
             Telemetry.err("Property %s is not set", Property.PACKAGE);
             return null;
 
-        } else if (configuration.get(Property.LAUNCHER_ACTIVITY, "").isEmpty()) {
+        } else if (configuration.get(Property.LAUNCHER_ACTIVITY).isEmpty()) {
             Telemetry.err("Property %s is not set", Property.LAUNCHER_ACTIVITY);
             return null;
         }

@@ -25,10 +25,13 @@ public class ConfigurationReader {
         for (String line : lines) {
             lineNumber++;
 
+            if (line.trim().isEmpty()) {
+                continue;
+            }
             if (line.contains("=")) {
                 int index = line.indexOf("=");
                 String propertyName = line.substring(0, index).trim();
-                String propertyValue = line.substring(index + 1, line.length()).trim();
+                String propertyValue = line.substring(index + 1).trim();
 
                 try {
                     Property property = Property.valueOf(propertyName);

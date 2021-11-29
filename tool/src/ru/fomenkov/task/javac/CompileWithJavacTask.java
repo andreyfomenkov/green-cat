@@ -1,5 +1,9 @@
 package ru.fomenkov.task.javac;
 
+import java.io.File;
+import java.util.List;
+import java.util.Set;
+
 import ru.fomenkov.GreenCat;
 import ru.fomenkov.Module;
 import ru.fomenkov.command.CommandExecutor;
@@ -11,10 +15,6 @@ import ru.fomenkov.task.ExecutionStatus;
 import ru.fomenkov.task.Task;
 import ru.fomenkov.task.TaskPurpose;
 import ru.fomenkov.telemetry.Telemetry;
-
-import java.io.File;
-import java.util.List;
-import java.util.Set;
 
 
 public class CompileWithJavacTask implements Task<ModuleDiffMessage, CompileWithJavacMessage> {
@@ -75,11 +75,17 @@ public class CompileWithJavacTask implements Task<ModuleDiffMessage, CompileWith
         }
         cmd = CommandLineBuilder.create("javac")
                 .add(new Parameter("-d", objDir.getAbsolutePath()))
-                .add(new Parameter("-source 1.8"))
-                .add(new Parameter("-target 1.8"))
+                .add(new Parameter("-source 1.8")) // TODO: java version
+                .add(new Parameter("-target 1.8")) // TODO: java version
                 .add(new Parameter("-encoding UTF-8"))
                 .add(new Parameter("-g"))
                 .add(new Parameter("-cp", classpath))
+
+//                .add(new Parameter("-sourcepath"))
+//                .add(new Parameter("-proc:none"))
+//                .add(new Parameter("-XDuseUnsharedTable=true"))
+//                .add(new Parameter("-bootclasspath /Users/andrey.fomenkov/Library/Android/sdk/platforms/android-30/android.jar:/Users/andrey.fomenkov/Library/Android/sdk/build-tools/30.0.2/core-lambda-stubs.jar"))
+
                 .add(new Parameter(srcBuilder.toString()))
                 .build();
 

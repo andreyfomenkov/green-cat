@@ -1,6 +1,10 @@
 package ru.fomenkov.task.dex;
 
-import ru.fomenkov.GreenCat;
+import java.io.File;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+
 import ru.fomenkov.command.CommandExecutor;
 import ru.fomenkov.command.CommandLineBuilder;
 import ru.fomenkov.command.Parameter;
@@ -10,11 +14,6 @@ import ru.fomenkov.task.ExecutionStatus;
 import ru.fomenkov.task.Task;
 import ru.fomenkov.task.TaskPurpose;
 import ru.fomenkov.telemetry.Telemetry;
-
-import java.io.File;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
 
 public class DexTask implements Task<ClassDesugarMessage, DexMessage> {
 
@@ -76,7 +75,7 @@ public class DexTask implements Task<ClassDesugarMessage, DexMessage> {
 
             // TODO: fix compile path
 
-            if (makeDex(buildToolsPath, "sdfhjsdgfhjsdfhjsdfhd", dexDir.getAbsolutePath())) {
+            if (makeDex(buildToolsPath, "/Users/andrey.fomenkov/Workspace/ok/build/greencat/compile", dexDir.getAbsolutePath())) {
                 Telemetry.log("DEX file(s) created");
                 return new DexMessage();
             } else {

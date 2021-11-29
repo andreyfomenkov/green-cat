@@ -4,7 +4,6 @@ import com.sun.istack.internal.NotNull;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Set;
 
 public class Configuration {
 
@@ -15,15 +14,12 @@ public class Configuration {
     }
 
     @NotNull
-    public String get(Property property, @NotNull String defaultValue) {
-        return properties.getOrDefault(property, defaultValue);
-    }
+    public String get(Property property) {
+        String value = properties.get(property);
 
-    public void remove(Property property) {
-        properties.remove(property);
-    }
-
-    public Set<Property> getProperties() {
-        return properties.keySet();
+        if (value == null) {
+            throw new IllegalStateException("No value found for property: " + property.name());
+        }
+        return value;
     }
 }

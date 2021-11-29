@@ -27,4 +27,17 @@ public class Module {
         }
         return false;
     }
+
+    public String encode() {
+        return name + ":" + modulePath + ":" + buildPath + ":" + variant;
+    }
+
+    public static Module decode(String str) throws IllegalArgumentException {
+        String[] parts = str.split(":");
+
+        if (parts.length != 4) {
+            throw new IllegalArgumentException("Failed to parse module from string: " + str);
+        }
+        return new Module(parts[0], parts[1], parts[2], parts[3]);
+    }
 }

@@ -1,9 +1,8 @@
 package ru.fomenkov.configuration;
 
 public enum Property {
-    JAVAC_BIN_PATH,
-    RETROLAMBDA_JAR_PATH,
-    ADB_TOOL_PATH,
     PACKAGE,
-    LAUNCHER_ACTIVITY
+    LAUNCHER_ACTIVITY,
+    JAVA_SOURCE,
+    JAVA_TARGET,
 }

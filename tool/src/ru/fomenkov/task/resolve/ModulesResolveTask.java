@@ -21,6 +21,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Function;
 
 public class ModulesResolveTask implements Task<ProjectSetupMessage, ModulesResolveMessage> {
 
@@ -34,57 +35,57 @@ public class ModulesResolveTask implements Task<ProjectSetupMessage, ModulesReso
         if (message.status == ExecutionStatus.ERROR) {
             return new ModulesResolveMessage(ExecutionStatus.ERROR, "Previous task failed");
         }
-
         String projectPath = message.getProjectPath();
-        String cmd = CommandLineBuilder.create("find")
-                .add(new Parameter(projectPath + "/.idea/modules", "-name '*.iml'")) // TODO: .idea/modules?
-                .build();
-
-        // TODO: getting modules and caching
-        ////////////////////////////////
+        List<Module> modules = new ArrayList<>();
         File file = new File("modules");
-        List<String> output;
 
         if (file.exists()) {
-            Telemetry.log("Reading modules file...");
+            // TODO: error handling
             try {
-                output = FileUtils.readLines(file);
+                List<String> encoded = FileUtils.readLines(file);
+
+                for (String entry : encoded) {
+                    Module module = Module.decode(entry);
+                    modules.add(module);
+                }
+                Telemetry.log("Cached modules file found with %s entries", modules.size());
+
             } catch (IOException e) {
-                output = CommandExecutor.execOnInputStream(cmd);
+                Telemetry.err("Failed to parse modules file: %s", e.getMessage());
             }
         } else {
-            output = CommandExecutor.execOnInputStream(cmd);
-        }
-        List<Module> modules = new ArrayList<>();
+            String cmd = CommandLineBuilder.create("find")
+                    .add(new Parameter(projectPath + "/.idea/modules", "-name '*.iml'"))
+                    .build();
+            List<String> output = CommandExecutor.execOnInputStream(cmd);
 
-        try {
-            if (file.createNewFile()) {
-                Telemetry.log("Creating new module file");
-            }
-            FileUtils.writeLines(file, output);
+            for (String path : output) {
+                path = path.trim();
 
-        } catch (IOException error) {
-            Telemetry.err("Failed to create modules file: %s", file.getAbsolutePath());
-        }
-        ////////////////////////////////
+                if (path.endsWith(".iml")) {
+                    try {
+                        Module module = getModuleInfo(path);
 
-        for (String path : output) {
-            path = path.trim();
-
-            if (path.endsWith(".iml")) {
-                try {
-                    Module module = getModuleInfo(path);
-
-                    if (module != null) {
-                        modules.add(module);
+                        if (module != null) {
+                            modules.add(module);
+                        }
+                    } catch (ModuleFileParsingException e) {
+                        Telemetry.err("Failed to parse project module file %s: %s", path, e.getMessage());
+                        return new ModulesResolveMessage(ExecutionStatus.ERROR, "Error parsing project module .iml file");
                     }
-                } catch (ModuleFileParsingException e) {
-                    Telemetry.err("Failed to parse project module file %s: %s", path, e.getMessage());
-                    return new ModulesResolveMessage(ExecutionStatus.ERROR, "Error parsing project module .iml file");
                 }
             }
-        }
+            List<String> encoded = new ArrayList<>(modules.size());
 
+            for (Module module : modules) {
+                encoded.add(module.encode());
+            }
+            try {
+                FileUtils.writeLines(file, encoded);
+            } catch (IOException e) {
+                Telemetry.err("Failed to write modules file: %s", e.getMessage());
+            }
+        }
         int modulesCount = modules.size();
         Telemetry.log("Found %d module%s", modulesCount, modulesCount == 1 ? "" : "s:");
 
@@ -131,7 +132,7 @@ public class ModulesResolveTask implements Task<ProjectSetupMessage, ModulesReso
             String buildPath = pathPlaceholder.replace("$MODULE_DIR$", moduleFileDir);
 
             String left = buildPath.substring(0, buildPath.indexOf(".idea"));
-            String right = buildPath.substring(buildPath.lastIndexOf("../") + 3, buildPath.length());
+            String right = buildPath.substring(buildPath.lastIndexOf("../") + 3);
             buildPath = left + right;
 
             String moduleVariant = "debug";
