@@ -200,6 +200,6 @@ public class GitDiffTask implements Task<ModulesResolveMessage, GitDiffMessage> 
 
     private boolean isSupportedFileFormat(File file) {
         String path = file.getAbsolutePath();
-        return path.endsWith(".java");
+        return path.endsWith(".java") || path.endsWith(".kt");
     }
 }

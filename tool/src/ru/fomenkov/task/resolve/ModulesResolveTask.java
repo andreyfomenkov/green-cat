@@ -4,6 +4,11 @@ import com.sun.istack.internal.Nullable;
 
 import org.apache.commons.io.FileUtils;
 
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+
 import ru.fomenkov.Module;
 import ru.fomenkov.command.CommandExecutor;
 import ru.fomenkov.command.CommandLineBuilder;
@@ -16,12 +21,6 @@ import ru.fomenkov.task.Task;
 import ru.fomenkov.task.TaskPurpose;
 import ru.fomenkov.telemetry.Telemetry;
 import ru.fomenkov.util.Utils;
-
-import java.io.File;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.function.Function;
 
 public class ModulesResolveTask implements Task<ProjectSetupMessage, ModulesResolveMessage> {
 
@@ -105,7 +104,7 @@ public class ModulesResolveTask implements Task<ProjectSetupMessage, ModulesReso
 
     @Nullable
     private Module getModuleInfo(String moduleFilePath) throws ModuleFileParsingException {
-        String moduleName = new File(moduleFilePath).getName().split("\\.")[0];
+        String moduleName = new File(moduleFilePath).getName().split("\\.")[1];
         String cmd = CommandLineBuilder.create("cat")
                 .add(new Parameter(moduleFilePath))
                 .add(new Parameter("| grep 'output url='"))

@@ -5,6 +5,8 @@ import ru.fomenkov.task.ExecutionStatus;
 
 import java.io.File;
 import java.util.Set;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 public class ModuleDiffMessage extends Message {
 
@@ -21,7 +23,11 @@ public class ModuleDiffMessage extends Message {
         return module;
     }
 
-    public Set<File> getFiles() {
-        return files;
+    public Set<File> getJavaFiles() {
+        return files.stream().filter(file -> file.getAbsolutePath().endsWith(".java")).collect(Collectors.toSet());
+    }
+
+    public Set<File> getKotlinFiles() {
+        return files.stream().filter(file -> file.getAbsolutePath().endsWith(".kt")).collect(Collectors.toSet());
     }
 }

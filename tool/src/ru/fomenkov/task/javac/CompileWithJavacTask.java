@@ -38,25 +38,16 @@ public class CompileWithJavacTask implements Task<ModuleDiffMessage, CompileWith
     public CompileWithJavacMessage exec(ModuleDiffMessage message) {
         if (message.status != ExecutionStatus.SUCCESS) {
             throw new IllegalArgumentException("Previous step execution failed");
-        } else if (message.getFiles().isEmpty()) {
+        } else if (message.getJavaFiles().isEmpty()) {
             throw new IllegalArgumentException("No files to compile from the previous step");
-        }
-        if (!createCompileDir(projectPath, message.getModule())) {
-            return new CompileWithJavacMessage(ExecutionStatus.ERROR, "Failed to create module directory");
         }
         Telemetry.log("Compiling with javac...");
 
-        if (compileWithJavac(message.getFiles(), classpath)) {
+        if (compileWithJavac(message.getJavaFiles(), classpath)) {
             return new CompileWithJavacMessage(projectPath, classpath);
         } else {
             return new CompileWithJavacMessage(ExecutionStatus.ERROR, "Compilation errors");
         }
-    }
-
-    private boolean createCompileDir(String projectPath, Module module) {
-        String dstPath = GreenCat.getCompileDir(projectPath, module.name).getAbsolutePath();
-        File dstDir = new File(dstPath);
-        return dstDir.exists() || dstDir.mkdirs();
     }
 
     private boolean compileWithJavac(Set<File> javaFiles, String classpath) {
@@ -73,6 +64,7 @@ public class CompileWithJavacTask implements Task<ModuleDiffMessage, CompileWith
             String path = file.getAbsolutePath();
             srcBuilder.append(path).append(" ");
         }
+
         cmd = CommandLineBuilder.create("javac")
                 .add(new Parameter("-d", objDir.getAbsolutePath()))
                 .add(new Parameter("-source 1.8")) // TODO: java version

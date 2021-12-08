@@ -5,10 +5,7 @@ public enum TaskPurpose {
     RESOLVE_MODULES("Resolving project modules"),
     GIT_DIFF("Determining source changes"),
     COMPILE_WITH_JAVAC("Compiling with javac"),
-    ANNOTATION_PROCESSING("Annotation processing"),
-    COMPILE_WITH_KOTLIN("Compiling with Kotlin"),
-    PROCESS_WITH_RETROLAMBDA("Processing with Retrolambda"),
-    PROCESS_WITH_DESUGAR("Processing with Desugar"),
+    COMPILE_WITH_KOTLINC("Compiling with kotlinc"),
     MAKE_DEX("Dexing"),
     DEPLOY_ON_DEVICE("Deploying changes on Android device"),
     RESTART_APPLICATION("Restarting application");

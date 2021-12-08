@@ -1,5 +1,13 @@
 package ru.fomenkov;
 
+import java.io.File;
+import java.io.IOException;
+import java.util.*;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.stream.Collectors;
+
 import ru.fomenkov.command.CommandExecutor;
 import ru.fomenkov.command.CommandLineBuilder;
 import ru.fomenkov.configuration.Configuration;
@@ -22,13 +30,6 @@ import ru.fomenkov.task.setup.ProjectSetupTask;
 import ru.fomenkov.telemetry.Telemetry;
 import ru.fomenkov.util.Log;
 import ru.fomenkov.util.Utils;
-
-import java.io.File;
-import java.io.IOException;
-import java.util.*;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 public class Main {
 
@@ -75,8 +76,6 @@ public class Main {
             Telemetry.err("TASK EXECUTION FAILED\n");
             return;
         }
-        printJdkInfo();
-
         if (!doIncrementalBuild(input, diff)) {
             Telemetry.err("COMPILATION FAILED\n");
             return;
@@ -154,8 +153,7 @@ public class Main {
     private static final String FIND_WITH_REMOVE_COMMAND = "find %s -type f ! \\( %s \\) -print0 | xargs -0 rm --";
 
     private static boolean prepareClassesForDex(LibraryInput input, Map<Module, Set<File>> diff) {
-        Telemetry.log(" ");
-        Telemetry.log("Cleaning up unused .class files...\n");
+        Telemetry.log("Cleaning up unused .class files...");
 
         StringBuilder filesKeepBuilder = new StringBuilder();
         boolean hasFile = false;
@@ -180,27 +178,50 @@ public class Main {
         for (String line : output) {
             Telemetry.log(line);
         }
-        Telemetry.log(" ");
         return output.size() == 0;
     }
 
     private static boolean doIncrementalBuild(LibraryInput input, Map<Module, Set<File>> diff) {
         boolean success = true;
-        int count = diff.size();
-        ExecutorService service = Executors.newFixedThreadPool(count);
+        int coresNumber = Runtime.getRuntime().availableProcessors();
+        ExecutorService service = Executors.newFixedThreadPool(coresNumber);
+
         String projectPath = input.getProjectPath();
         String classpath = input.getClasspath();
-        CountDownLatch latch = new CountDownLatch(count);
         List<String> failedReports = Collections.synchronizedList(new ArrayList<>());
+        Map<Module, Set<File>> javaDiff = new HashMap<>();
+        Map<Module, Set<File>> kotlinDiff = new HashMap<>();
 
-        for (Module module : diff.keySet()) {
+        for (Map.Entry<Module, Set<File>> entry : diff.entrySet()) {
+            Module module = entry.getKey();
+            Set<File> files = entry.getValue();
+            Set<File> javaFiles = files.stream().filter(file -> file.getPath().endsWith(".java")).collect(Collectors.toSet());
+            Set<File> kotlinFiles = files.stream().filter(file -> file.getPath().endsWith(".kt")).collect(Collectors.toSet());
+
+            if (!javaFiles.isEmpty()) {
+                javaDiff.put(module, javaFiles);
+            }
+            if (!kotlinFiles.isEmpty()) {
+                kotlinDiff.put(module, kotlinFiles);
+            }
+        }
+
+        for (Module module : diff.keySet()) { // Create compile dirs
+            if (!createCompileDir(projectPath, module)) {
+                Telemetry.err("Failed to create compile dir for module %s", module.name);
+                success = false;
+            }
+        }
+        CountDownLatch latch = new CountDownLatch(javaDiff.size() + kotlinDiff.size());
+
+        for (Module module : kotlinDiff.keySet()) {
             service.submit(() -> {
-                Telemetry.log("Starting incremental build for module [%s]\n", module.name);
-                IncrementalBuild build = new IncrementalBuild(projectPath, classpath, module, diff);
+                Telemetry.log("[KOTLIN] Starting incremental build for module [%s]", module.name);
+                IncrementalBuild build = new IncrementalBuild(projectPath, classpath, module, diff, IncrementalBuild.Language.KOTLIN);
                 IncrementalBuild.Result result = build.submit();
 
                 if (result.status == ExecutionStatus.SUCCESS) {
-                    Telemetry.log("Building complete for module [%s]\n", module.name);
+                    Telemetry.log("Building complete for module [%s]", module.name);
 
                 } else if (result.status == ExecutionStatus.TERMINATED) {
                     Telemetry.err("Building terminated for module [%s]", module.name);
@@ -210,7 +231,26 @@ public class Main {
                     Telemetry.err("Building failed for module [%s]", module.name);
 //                    failedReports.add(result.report); TODO: report?
                 }
-                Telemetry.log(" ");
+                latch.countDown();
+            });
+        }
+        for (Module module : javaDiff.keySet()) {
+            service.submit(() -> {
+                Telemetry.log("[JAVA] Starting incremental build for module [%s]", module.name);
+                IncrementalBuild build = new IncrementalBuild(projectPath, classpath, module, diff, IncrementalBuild.Language.JAVA);
+                IncrementalBuild.Result result = build.submit();
+
+                if (result.status == ExecutionStatus.SUCCESS) {
+                    Telemetry.log("Building complete for module [%s]", module.name);
+
+                } else if (result.status == ExecutionStatus.TERMINATED) {
+                    Telemetry.err("Building terminated for module [%s]", module.name);
+//                    failedReports.add(result.report); TODO: report?
+
+                } else {
+                    Telemetry.err("Building failed for module [%s]", module.name);
+//                    failedReports.add(result.report); TODO: report?
+                }
                 latch.countDown();
             });
         }
@@ -227,6 +267,12 @@ public class Main {
         }
         service.shutdown();
         return success;
+    }
+
+    private static boolean createCompileDir(String projectPath, Module module) {
+        String dstPath = GreenCat.getCompileDir(projectPath, module.name).getAbsolutePath();
+        File dstDir = new File(dstPath);
+        return dstDir.exists() || dstDir.mkdirs();
     }
 
     private static TaskExecutor.Result resolveProject(String projectPath) {

@@ -60,7 +60,7 @@ public class TaskExecutor {
             try {
                 TaskPurpose purpose = task.getPurpose();
                 Telemetry.log("");
-                Telemetry.log("[STEP %d/%d] %s: %s", i + 1, size, purpose, purpose.value());
+                Telemetry.log("[#] %s [#]", purpose.value().toUpperCase());
 
                 long start = System.currentTimeMillis();
                 message = task.exec(message);
