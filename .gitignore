@@ -11,5 +11,12 @@ tool/.idea/*.iws
 tool/*.zip
 tool/greencat.properties
 
+plugin/out
+plugin/.idea/workspace.xml
+plugin/.idea/tasks.xml
+plugin/.idea/*.iws
+plugin/*.zip
+plugin/greencat.properties
+
 .DS_Store
 .idea
