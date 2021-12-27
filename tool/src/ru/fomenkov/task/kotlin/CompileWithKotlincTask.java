@@ -81,15 +81,15 @@ public class CompileWithKotlincTask implements Task<ModuleDiffMessage, CompileWi
                 break;
             }
         }
-//        for (String line : output) {
-//            line = line.replace("%", "");
-//
-//            if (compilationSuccess) {
-//                Telemetry.log(line);
-//            } else {
-//                Telemetry.err(line);
-//            }
-//        }
+        for (String line : output) {
+            line = line.replace("%", "");
+
+            if (compilationSuccess) {
+                Telemetry.log(line);
+            } else {
+                Telemetry.err(line);
+            }
+        }
 //        Telemetry.log("");
 
         if (compilationSuccess) {

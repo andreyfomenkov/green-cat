@@ -1,5 +1,7 @@
 package ru.fomenkov;
 
+import org.apache.commons.io.FileUtils;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.*;
@@ -44,6 +46,17 @@ public class Main {
             Telemetry.err("Failed to read arguments: %s", error.getMessage());
             return;
         }
+        // TODO: fallback when Android Studio crashes and $CLASSPATH is incomplete
+        try {
+            File classpathFile = new File("/Users/andrey.fomenkov/Workspace/scripts/classpath");
+            String classpath = FileUtils.readFileToString(classpathFile);
+            input.setClasspath(classpath);
+            Telemetry.log("Classpath size: " + classpathFile.length());
+
+        } catch (IOException e) {
+            Telemetry.err("Failed to read classpath");
+        }
+        // TODO: remove
         Configuration config = readConfigFile();
 
         if (config == null) {
@@ -94,9 +107,23 @@ public class Main {
             Telemetry.err("DEXING AND DEPLOYMENT FAILED\n");
             return;
         }
-
         long endTime = System.nanoTime();
-        Telemetry.log("DEPLOYMENT COMPLETE IN %s SEC\n", Utils.formatNanoTimeToSeconds(endTime - startTime));
+        String total = Utils.formatNanoTimeToSeconds(endTime - startTime);
+
+        // Hack
+        if (total.length() == 1) {
+            Telemetry.log("╔════════════════════════════════╗");
+            Telemetry.log("║                                ║");
+            Telemetry.log("║  DEPLOYMENT COMPLETE IN %s SEC  ║", total);
+            Telemetry.log("║                                ║");
+            Telemetry.log("╚════════════════════════════════╝");
+        } else {
+            Telemetry.log("╔═════════════════════════════════╗");
+            Telemetry.log("║                                 ║");
+            Telemetry.log("║  DEPLOYMENT COMPLETE IN %s SEC  ║", total);
+            Telemetry.log("║                                 ║");
+            Telemetry.log("╚═════════════════════════════════╝");
+        }
     }
 
     private static void printJdkInfo() {
@@ -144,8 +171,8 @@ public class Main {
                                             String appPackage, String launcherActivity) {
         TaskExecutor.Result result = TaskExecutor.create(null)
                 .add(new DexTask(androidSdkPath, dexDir))
-                .add(new DeployTask(androidSdkPath, dexDir.getAbsolutePath(), deployPath))
-                .add(new RestartAppTask(androidSdkPath, appPackage, launcherActivity))
+//                .add(new DeployTask(androidSdkPath, dexDir.getAbsolutePath(), deployPath))
+//                .add(new RestartAppTask(androidSdkPath, appPackage, launcherActivity))
                 .execute();
         return result.status == ExecutionStatus.SUCCESS;
     }
