@@ -6,7 +6,7 @@ import ru.fomenkov.plugin.task.resolve.ProjectResolveTask
 import ru.fomenkov.plugin.util.Telemetry
 
 fun main(args: Array<String>) {
-    Telemetry.isVerbose = true
+    Telemetry.isVerbose = false
 
     val result = ProjectResolveTask(
         GradleProjectInput(
