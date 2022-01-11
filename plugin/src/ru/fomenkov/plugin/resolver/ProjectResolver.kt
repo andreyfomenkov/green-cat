@@ -29,7 +29,7 @@ class ProjectResolver(
                     }
                     map += property to value
                 } else {
-//                    Telemetry.verboseErr("[$propertiesFileName] Skipping line: $line")
+                    Telemetry.verboseErr("[$propertiesFileName] Skipping line: $line")
                 }
             }
         return map
@@ -74,10 +74,10 @@ class ProjectResolver(
         return set
     }
 
-    fun parseModuleBuildGradleFile(moduleName: String): Set<Dependency> {
-        Telemetry.verboseLog("Parsing $moduleName/build.gradle")
+    fun parseModuleBuildGradleFile(modulePath: String): Set<Dependency> {
+        Telemetry.verboseLog("Parsing $modulePath/build.gradle")
         val deps = mutableSetOf<Dependency>()
-        val path = "$moduleName/$BUILD_GRADLE_FILE_NAME"
+        val path = "$modulePath/$BUILD_GRADLE_FILE_NAME"
         var insideDepsBlock = false
 
         File(path).readLines()
@@ -92,13 +92,13 @@ class ProjectResolver(
 
                 } else if (insideDepsBlock) {
                     val dependency = when {
-                        line.startsWith(FILES_IMPLEMENTATION_PREFIX) || line.startsWith(FILES_API_PREFIX) -> {
-                            parseFilesDependency(moduleName, line)
+                        line.hasFilesImplementationPrefix() || line.hasFilesApiPrefix() -> {
+                            parseFilesDependency(modulePath, line)
                         }
-                        line.startsWith(PROJECT_IMPLEMENTATION_PREFIX) || line.startsWith(PROJECT_API_PREFIX) -> {
+                        line.hasProjectImplementationPrefix() || line.hasProjectApiPrefix() -> {
                             parseModuleDependency(line)
                         }
-                        line.startsWith(LIBRARY_IMPLEMENTATION_PREFIX) || line.startsWith(LIBRARY_API_PREFIX) -> {
+                        line.hasLibraryImplementationPrefix() || line.hasLibraryApiPrefix() -> {
                             parseLibraryDependency(line)
                         }
                         else -> null
@@ -106,7 +106,7 @@ class ProjectResolver(
                     if (dependency != null) {
                         deps += dependency
                     } else {
-//                        Telemetry.verboseErr("[$path] Skipping line: $line")
+                        Telemetry.verboseErr("[$path] Skipping line: $line")
                     }
                 }
             }
@@ -135,7 +135,7 @@ class ProjectResolver(
         return aars.toSet()
     }
 
-    private fun parseFilesDependency(moduleName: String, line: String): Dependency? {
+    private fun parseFilesDependency(modulePath: String, line: String): Dependency? {
         if (line.count { char -> char == '\'' } != 2) {
             error("[File dependency] Failed to parse line: $line")
         }
@@ -147,12 +147,8 @@ class ProjectResolver(
         }
         val filePath = line.substring(startIndex + 1, endIndex)
         return when {
-            line.startsWith(FILES_IMPLEMENTATION_PREFIX) -> {
-                Dependency.Files(moduleName = moduleName, filePath = filePath, relation = Relation.IMPLEMENTATION)
-            }
-            line.startsWith(FILES_API_PREFIX) -> {
-                Dependency.Files(moduleName = moduleName, filePath = filePath, relation = Relation.API)
-            }
+            line.hasFilesImplementationPrefix() -> Dependency.Files(modulePath = modulePath, filePath = filePath, relation = Relation.IMPLEMENTATION)
+            line.hasFilesApiPrefix() -> Dependency.Files(modulePath = modulePath, filePath = filePath, relation = Relation.API)
             else -> null
         }
     }
@@ -166,28 +162,19 @@ class ProjectResolver(
         }
         val moduleName = line.substring(startIndex + 2, endIndex).replace(":", "/")
         return when {
-            line.startsWith(PROJECT_IMPLEMENTATION_PREFIX) -> {
-                Dependency.Project(moduleName = moduleName, relation = Relation.IMPLEMENTATION)
-            }
-            line.startsWith(PROJECT_API_PREFIX) -> {
-                Dependency.Project(moduleName = moduleName, relation = Relation.API)
-            }
+            line.hasProjectImplementationPrefix() -> Dependency.Project(moduleName = moduleName, relation = Relation.IMPLEMENTATION)
+            line.hasProjectApiPrefix() -> Dependency.Project(moduleName = moduleName, relation = Relation.API)
             else -> null
         }
     }
 
     private fun parseLibraryDependency(line: String): Dependency? {
         val relation = when {
-            line.startsWith(LIBRARY_IMPLEMENTATION_PREFIX) -> {
-                Relation.IMPLEMENTATION
-            }
-            line.startsWith(LIBRARY_API_PREFIX) -> {
-                Relation.API
-            }
+            line.hasLibraryImplementationPrefix() -> Relation.IMPLEMENTATION
+            line.hasLibraryApiPrefix() -> Relation.API
             else -> return null
         }
         val artifact = line.run {
-            // implementation group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: '2.11.2'
             if (line.contains("group:") && contains("name:") && contains("version:")) {
                 val parts = line.split(",")
 
@@ -205,6 +192,14 @@ class ProjectResolver(
                     it.substring(startIndex + 1, endIndex)
                 }
                 "$group:$name"
+            } else if (line.replace(" ", "").contains("rootProject")) { // TODO: refactor
+                val parts = line.split("rootProject")
+
+                if (parts.size != 2) {
+                    error("[Library dependency] Failed to parse line: $line")
+                }
+                val first = parts[0]
+                first.substring(first.indexOf("'") + 1, first.lastIndexOf(":"))
             } else {
                 val startIndex = line.indexOf("'")
                 val endIndex = line.lastIndexOf(":")
@@ -220,6 +215,11 @@ class ProjectResolver(
             val part = split("'").find(::isVersionOrPlaceholder) ?: return null
             part
         }
+        /////////////
+        if (line.replace(" ", "").contains("storekeeper")) {
+            println()
+        }
+        /////////////
         return Dependency.Library(artifact = artifact, version = version, relation = relation)
     }
 
@@ -235,15 +235,24 @@ class ProjectResolver(
         return true
     }
 
+    // TODO: need to optimize
+    private fun String.collapse() = replace(" ", "").replace("(", "").trim()
+
+    private fun String.hasFilesImplementationPrefix() = collapse().startsWith("implementationfiles")
+
+    private fun String.hasFilesApiPrefix() = collapse().startsWith("apifiles")
+
+    private fun String.hasProjectImplementationPrefix() = collapse().startsWith("implementationproject")
+
+    private fun String.hasProjectApiPrefix() = collapse().startsWith("apiproject")
+
+    private fun String.hasLibraryImplementationPrefix() = collapse().startsWith("implementation")
+
+    private fun String.hasLibraryApiPrefix() = collapse().startsWith("api")
+
     private companion object {
         const val BUILD_GRADLE_FILE_NAME = "build.gradle"
         const val DEPENDENCIES_BLOCK_START = "dependencies"
         const val DEPENDENCIES_BLOCK_END = "}"
-        const val FILES_IMPLEMENTATION_PREFIX = "implementation files"
-        const val FILES_API_PREFIX = "api files"
-        const val PROJECT_IMPLEMENTATION_PREFIX = "implementation project"
-        const val PROJECT_API_PREFIX = "api project"
-        const val LIBRARY_IMPLEMENTATION_PREFIX = "implementation"
-        const val LIBRARY_API_PREFIX = "api"
     }
 }

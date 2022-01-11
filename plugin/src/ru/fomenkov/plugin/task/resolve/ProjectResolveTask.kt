@@ -1,5 +1,7 @@
 package ru.fomenkov.plugin.task.resolve
 
+import ru.fomenkov.plugin.project.Library
+import ru.fomenkov.plugin.project.Module
 import ru.fomenkov.plugin.resolver.Dependency
 import ru.fomenkov.plugin.resolver.ModuleDeclaration
 import ru.fomenkov.plugin.resolver.ProjectResolver
@@ -9,40 +11,81 @@ import java.io.File
 
 class ProjectResolveTask(
     private val input: GradleProjectInput,
-) : Task<GradleProjectInput, ProjectDependencies>(input) {
+) : Task<GradleProjectInput, ProjectGraph>(input) {
 
     // TODO: some deps in settings.gradle depend on local.properties file. Ignore for the first time
-    private val ignoredModules = setOf(
-        "gl-ndk-renderer",
-        "facedetect",
-    )
+    private val ignoredModules = emptySet<String>()
+    // TODO: put in a separate file
+    private val ignoredLibs = emptySet<String>()
 
-    override fun body(): ProjectDependencies {
+    override fun body(): ProjectGraph {
         val resolver = ProjectResolver(
             propertiesFileName = input.propertiesFileName,
             settingsFileName = input.settingsFileName,
         )
         val properties = resolver.parseGradleProperties()
-        val moduleDeclarations = resolver.parseModuleDeclarations()
-        Telemetry.log("Total ${moduleDeclarations.size} module(s)")
+        val moduleDeclarations = resolver
+            .parseModuleDeclarations()
+        Telemetry.log("Project has ${moduleDeclarations.size} module(s)")
 
-        //
         val jars = resolver.findAllJarsInGradleCache(GRADLE_CACHE_PATH)
         val aars = resolver.findAllAarsInGradleCache(GRADLE_CACHE_PATH)
-        Telemetry.verboseLog("Total JARs: ${jars.size}, AARs: ${aars.size}")
-        //
+        Telemetry.verboseLog("Total JARs: ${jars.size}, AARs: ${aars.size} in Gradle cache")
+
+        val graph = mutableSetOf<Module>()
+        val moduleDependencies = moduleDeclarations
+            .associate { declaration ->
+                val modulePath = declaration.path
+                val deps = resolver.parseModuleBuildGradleFile(modulePath)
+                modulePath to deps
+            }
+
+        val moduleLibs = moduleDependencies
+            .mapValues { (modulePath, deps) ->
+                val libs = mutableSetOf<Library>()
+                val versions = validateAndResolveLibraryVersions(modulePath, deps, properties, moduleDeclarations)
+
+                deps.forEach { dependency ->
+                    if (dependency is Dependency.Library) {
+                        val artifact = dependency.artifact
+                        libs += Library(
+                            name = artifact,
+                            version = checkNotNull(versions[artifact]) { "No version for artifact $artifact" },
+                            cachePaths = setOf(), // TODO: add
+                        )
+                    }
+                }
+                libs
+            }
 
         moduleDeclarations.forEach { declaration ->
-            val moduleName = declaration.path
-            val deps = resolver.parseModuleBuildGradleFile(moduleName)
-            val resolvedLibs = validateAndResolveLibraryVersions(moduleName, deps, properties, moduleDeclarations)
-            getArtifactArchivePaths(resolvedLibs, jars + aars)
+            val modulePath = declaration.path
+
+            graph += Module(
+                name = declaration.name,
+                path = modulePath,
+                children = setOf(),
+                parents = setOf(),
+                libraries = checkNotNull(moduleLibs[modulePath]) { "No libs provided for module $modulePath" },
+            )
         }
-        Telemetry.log("Project resolving is complete")
-        return ProjectDependencies
+
+//        moduleDeclarations.forEach { declaration ->
+//            val modulePath = declaration.path
+//
+//            val deps = resolver.parseModuleBuildGradleFile(modulePath)
+//            val resolvedLibs = validateAndResolveLibraryVersions(modulePath, deps, properties, moduleDeclarations)
+//            val cachePaths = getArtifactArchivePaths(resolvedLibs, jars + aars)
+//        }
+        ////////
+        graph.forEach { module -> Telemetry.log(module.toString()) }
+        ////////
+        return ProjectGraph(graph)
     }
 
     private fun isIgnoredModule(moduleName: String) = ignoredModules.contains(moduleName)
+
+    private fun isIgnoredLib(artifact: String) = ignoredLibs.contains(artifact)
 
     /**
      * @param resolvedLibs map of artifact to resolved versions
@@ -87,26 +130,26 @@ class ProjectResolveTask(
     }
 
     private fun validateAndResolveLibraryVersions(
-        moduleName: String,
+        modulePath: String,
         deps: Set<Dependency>,
         properties: Map<String, String>,
         moduleDeclarations: Set<ModuleDeclaration>,
     ): Map<String, String> {
-        Telemetry.verboseLog("[$moduleName] Validating module declarations")
+        Telemetry.verboseLog("[$modulePath] Validating module declarations")
         moduleDeclarations.forEach { declaration ->
             val path = "${declaration.path}/$GRADLE_BUILD_FILE"
             if (!File(path).exists()) {
                 error("File not found: $path")
             }
         }
-        Telemetry.verboseLog("[$moduleName] Resolving module dependencies")
+        Telemetry.verboseLog("[$modulePath] Resolving module dependencies")
         val moduleNames = moduleDeclarations.map { declaration -> declaration.name }.toSet()
         val resolvedLibs = mutableMapOf<String, String>()
 
         deps.forEach { dependency ->
             when (dependency) {
                 is Dependency.Files -> {
-                    val path = dependency.moduleName + "/" + dependency.filePath
+                    val path = dependency.modulePath + "/" + dependency.filePath
                     if (!File(path).exists()) {
                         error("Local file dependency not found: $path")
                     }
@@ -120,21 +163,24 @@ class ProjectResolveTask(
                 }
                 is Dependency.Library -> {
                     val artifact = dependency.artifact
-                    val placeholderOrVersion = dependency.version
-                    val version = if (isVersionResolved(placeholderOrVersion)) {
-                        placeholderOrVersion
-                    } else {
-                        properties[placeholderOrVersion]
-                    }
-                    if (version == null) {
-                        Telemetry.err("[$moduleName] No placeholder version: $placeholderOrVersion for $moduleName")
-                    } else {
-                        resolvedLibs += artifact to version
+
+                    if (!isIgnoredLib(artifact)) {
+                        val placeholderOrVersion = dependency.version
+                        val version = if (isVersionResolved(placeholderOrVersion)) {
+                            placeholderOrVersion
+                        } else {
+                            properties[placeholderOrVersion]
+                        }
+                        if (version == null) {
+                            Telemetry.err("[$modulePath] No placeholder version: $placeholderOrVersion for $modulePath")
+                        } else {
+                            resolvedLibs += artifact to version
+                        }
                     }
                 }
             }
         }
-        Telemetry.verboseLog("[$moduleName] Validation is OK")
+        Telemetry.verboseLog("[$modulePath] Validation is OK")
         return resolvedLibs
     }
 

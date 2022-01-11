@@ -2,7 +2,7 @@ package ru.fomenkov.plugin.resolver
 
 sealed class Dependency {
 
-    data class Files(val moduleName: String, val filePath: String, val relation: Relation) : Dependency()
+    data class Files(val modulePath: String, val filePath: String, val relation: Relation) : Dependency()
 
     data class Project(val moduleName: String, val relation: Relation) : Dependency()
 

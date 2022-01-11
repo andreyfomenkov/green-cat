@@ -15,7 +15,8 @@ fun main(args: Array<String>) {
         )
     ).run()
 
-    if (result is Result.Error) {
-        Telemetry.err("Error: ${result.error.localizedMessage}")
+    when (result) {
+        is Result.Complete -> Telemetry.log("* * * GreenCat: OK * * *")
+        is Result.Error -> Telemetry.err("* * * GreenCat FAIL: ${result.error.localizedMessage} * * *")
     }
 }
