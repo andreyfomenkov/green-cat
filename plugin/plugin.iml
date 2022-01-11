@@ -10,7 +10,6 @@
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="library" name="KotlinJavaRuntime" level="project" />
-    <orderEntry type="library" name="beust.klaxon" level="application" />
     <orderEntry type="module-library">
       <library name="JUnit5.7.0">
         <CLASSES>
@@ -27,5 +26,6 @@
         <SOURCES />
       </library>
     </orderEntry>
+    <orderEntry type="library" name="google.code.gson" level="application" />
   </component>
 </module>

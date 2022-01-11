@@ -1,6 +1,6 @@
 package ru.fomenkov.plugin.task.config
 
-import com.beust.klaxon.Klaxon
+import com.google.gson.Gson
 import ru.fomenkov.plugin.task.Task
 import ru.fomenkov.plugin.util.Telemetry
 import java.io.File
@@ -13,7 +13,8 @@ class ReadPluginConfigTask(private val configFilePath: String) : Task<String, Pl
         if (!file.exists()) {
             error("No configuration file found: $configFilePath")
         }
-        val configuration = checkNotNull(Klaxon().parse<PluginConfiguration>(file)) { "Unable to parse configuration" }
+        val text = file.readText()
+        val configuration = Gson().fromJson(text, PluginConfiguration::class.java)
 
         Telemetry.verboseLog("Plugin configuration:")
         Telemetry.verboseLog(configuration.toString())

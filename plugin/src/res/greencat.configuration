@@ -2,10 +2,10 @@
     "ignoredModules": [
         "module-a",
         "module-b",
-        "module-c",
+        "module-c"
     ],
     "ignoredLibs": [
         "lib-a",
         "lib-b"
-    ],
+    ]
 }
