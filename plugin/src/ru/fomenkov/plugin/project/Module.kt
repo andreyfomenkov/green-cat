@@ -3,9 +3,9 @@ package ru.fomenkov.plugin.project
 data class Module(
     val name: String,
     val path: String,
-    val children: Set<Module>,
-    val parents: Set<Module>,
-    val libraries: Set<Library>,
+    val children: MutableSet<Module>,
+    val parents: MutableSet<Module>,
+    val libraries: MutableSet<Library>,
 ) {
 
     override fun toString() = StringBuilder("# Module: $name #\n").apply {

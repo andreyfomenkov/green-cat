@@ -192,14 +192,14 @@ class ProjectResolver(
                     it.substring(startIndex + 1, endIndex)
                 }
                 "$group:$name"
-            } else if (line.replace(" ", "").contains("rootProject")) { // TODO: refactor
-                val parts = line.split("rootProject")
-
-                if (parts.size != 2) {
-                    error("[Library dependency] Failed to parse line: $line")
-                }
-                val first = parts[0]
-                first.substring(first.indexOf("'") + 1, first.lastIndexOf(":"))
+//            } else if (line.replace(" ", "").contains("rootProject")) { // TODO: refactor
+//                val parts = line.split("rootProject")
+//
+//                if (parts.size != 2) {
+//                    error("[Library dependency] Failed to parse line: $line")
+//                }
+//                val first = parts[0]
+//                first.substring(first.indexOf("'") + 1, first.lastIndexOf(":"))
             } else {
                 val startIndex = line.indexOf("'")
                 val endIndex = line.lastIndexOf(":")

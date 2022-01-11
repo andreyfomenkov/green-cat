@@ -1,6 +1,5 @@
 package ru.fomenkov.plugin.task.resolve
 
-import ru.fomenkov.plugin.project.Library
 import ru.fomenkov.plugin.project.Module
 import ru.fomenkov.plugin.resolver.Dependency
 import ru.fomenkov.plugin.resolver.ModuleDeclaration
@@ -12,11 +11,6 @@ import java.io.File
 class ProjectResolveTask(
     private val input: GradleProjectInput,
 ) : Task<GradleProjectInput, ProjectGraph>(input) {
-
-    // TODO: some deps in settings.gradle depend on local.properties file. Ignore for the first time
-    private val ignoredModules = emptySet<String>()
-    // TODO: put in a separate file
-    private val ignoredLibs = emptySet<String>()
 
     override fun body(): ProjectGraph {
         val resolver = ProjectResolver(
@@ -39,34 +33,53 @@ class ProjectResolveTask(
                 val deps = resolver.parseModuleBuildGradleFile(modulePath)
                 modulePath to deps
             }
+        val moduleChildProjects = mutableMapOf<String, MutableSet<String>>()
+        val moduleParentProjects = mutableMapOf<String, MutableSet<String>>()
 
-        val moduleLibs = moduleDependencies
-            .mapValues { (modulePath, deps) ->
-                val libs = mutableSetOf<Library>()
-                val versions = validateAndResolveLibraryVersions(modulePath, deps, properties, moduleDeclarations)
+        moduleDependencies.forEach { (modulePath, deps) ->
+            val childProjects = moduleChildProjects[modulePath] ?: mutableSetOf()
 
-                deps.forEach { dependency ->
-                    if (dependency is Dependency.Library) {
-                        val artifact = dependency.artifact
-                        libs += Library(
-                            name = artifact,
-                            version = checkNotNull(versions[artifact]) { "No version for artifact $artifact" },
-                            cachePaths = setOf(), // TODO: add
-                        )
-                    }
+            deps.forEach { dependency ->
+                if (dependency is Dependency.Project) {
+                    val child = dependency.moduleName
+                    childProjects += child
+
+                    val parentProjects = moduleParentProjects[child] ?: mutableSetOf()
+                    parentProjects += modulePath
+                    moduleParentProjects[child] = parentProjects
                 }
-                libs
             }
+            moduleChildProjects[modulePath] = childProjects
+        }
 
+//        val moduleLibs = moduleDependencies
+//            .mapValues { (modulePath, deps) ->
+//                val libs = mutableSetOf<Library>()
+//                val versions = validateAndResolveLibraryVersions(modulePath, deps, properties, moduleDeclarations)
+//
+//                deps.forEach { dependency ->
+//                    if (dependency is Dependency.Library) {
+//                        val artifact = dependency.artifact
+//                        libs += Library(
+//                            name = artifact,
+//                            version = checkNotNull(versions[artifact]) { "No version for artifact $artifact" },
+//                            cachePaths = setOf(), // TODO: add
+//                        )
+//                    }
+//                }
+//                libs
+//            }
+//
         moduleDeclarations.forEach { declaration ->
             val modulePath = declaration.path
 
             graph += Module(
                 name = declaration.name,
                 path = modulePath,
-                children = setOf(),
-                parents = setOf(),
-                libraries = checkNotNull(moduleLibs[modulePath]) { "No libs provided for module $modulePath" },
+                children = mutableSetOf(),
+                parents = mutableSetOf(),
+                libraries = mutableSetOf(),
+//                libraries = checkNotNull(moduleLibs[modulePath]) { "No libs provided for module $modulePath" },
             )
         }
 
@@ -78,14 +91,26 @@ class ProjectResolveTask(
 //            val cachePaths = getArtifactArchivePaths(resolvedLibs, jars + aars)
 //        }
         ////////
-        graph.forEach { module -> Telemetry.log(module.toString()) }
+
+        // commons-persist
+        //
+
+        graph.forEach { module ->
+            val name = module.name
+            val children = moduleChildProjects[name] ?: mutableSetOf()
+            val parents = moduleParentProjects[name] ?: mutableSetOf()
+
+            Telemetry.log("\n### Module: $name, children: ${children.size}, parents: ${parents.size}")
+            children.forEach { name -> Telemetry.log("[CHILD] $name") }
+            parents.forEach { name -> Telemetry.log("[PARENT] $name") }
+        }
         ////////
         return ProjectGraph(graph)
     }
 
-    private fun isIgnoredModule(moduleName: String) = ignoredModules.contains(moduleName)
+    private fun isIgnoredModule(moduleName: String) = input.ignoredModules.contains(moduleName)
 
-    private fun isIgnoredLib(artifact: String) = ignoredLibs.contains(artifact)
+    private fun isIgnoredLib(artifact: String) = input.ignoredLibs.contains(artifact)
 
     /**
      * @param resolvedLibs map of artifact to resolved versions
