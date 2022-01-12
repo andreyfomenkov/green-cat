@@ -18,8 +18,7 @@ class ProjectResolveTask(
             settingsFileName = input.settingsFileName,
         )
         val properties = resolver.parseGradleProperties()
-        val moduleDeclarations = resolver
-            .parseModuleDeclarations()
+        val moduleDeclarations = resolver.parseModuleDeclarations()
         Telemetry.log("Project has ${moduleDeclarations.size} module(s)")
 
         val jars = resolver.findAllJarsInGradleCache(GRADLE_CACHE_PATH)
@@ -83,13 +82,13 @@ class ProjectResolveTask(
             )
         }
 
-//        moduleDeclarations.forEach { declaration ->
-//            val modulePath = declaration.path
-//
-//            val deps = resolver.parseModuleBuildGradleFile(modulePath)
-//            val resolvedLibs = validateAndResolveLibraryVersions(modulePath, deps, properties, moduleDeclarations)
-//            val cachePaths = getArtifactArchivePaths(resolvedLibs, jars + aars)
-//        }
+        moduleDeclarations.forEach { declaration ->
+            val modulePath = declaration.path
+
+            val deps = resolver.parseModuleBuildGradleFile(modulePath)
+            val resolvedLibs = validateAndResolveLibraryVersions(modulePath, deps, properties, moduleDeclarations)
+            val cachePaths = getArtifactArchivePaths(resolvedLibs, jars + aars)
+        }
         ////////
 
         // commons-persist
@@ -126,6 +125,7 @@ class ProjectResolveTask(
             var versionPath = artifact.replace(":", "/") + "/" + version
             var jarPaths = archivePaths.filter { jar -> jar.contains(versionPath) }.toSet()
 
+            // TODO: refactor
             if (jarPaths.isEmpty()) {
                 val libraryPath = artifact.replace(":", "/")
                 val versionPaths = archivePaths.filter { jar -> jar.contains(libraryPath) }
@@ -148,6 +148,11 @@ class ProjectResolveTask(
             }
             if (jarPaths.isEmpty()) {
                 Telemetry.err("No JARs / AARs found in Gradle cache for artifact: $artifact ($version)")
+            }
+            jarPaths.forEach { path ->
+                if (!File(path).exists()) {
+                    error("Resource doesn't exist: $path")
+                }
             }
             resolvedPaths += artifact to jarPaths
         }
@@ -191,10 +196,10 @@ class ProjectResolveTask(
 
                     if (!isIgnoredLib(artifact)) {
                         val placeholderOrVersion = dependency.version
-                        val version = if (isVersionResolved(placeholderOrVersion)) {
-                            placeholderOrVersion
-                        } else {
-                            properties[placeholderOrVersion]
+                        val version = when {
+                            placeholderOrVersion.isBlank() -> "" // Use the latest artifact version (workaround for compound version)
+                            isVersionResolved(placeholderOrVersion) -> placeholderOrVersion
+                            else -> properties[placeholderOrVersion]
                         }
                         if (version == null) {
                             Telemetry.err("[$modulePath] No placeholder version: $placeholderOrVersion for $modulePath")
