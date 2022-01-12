@@ -20,7 +20,11 @@ dependencies {
     implementation "org.jmdns:jmdns:3.5.1"
     implementation 'ru.ok.android-android2:duration-interval:${rootProject.property("library_b.version")}@aar'
     api "com.facebook.device.yearclass:yearclass:${rootProject.property("library_a.version")}"
-    implementation("com.google.android:library:" + rootProject["android.library.version"] + ':all')
+    implementation("com.google.android:library:" + rootProject["library_c.version"] + ':all')
+    implementation fileTree(dir: 'libs', include: ['*.jar']) // Ignored
+    implementation "me.leolin:ShortcutBadger:1.1.22@aar"
+    // Don't parse compound version, use the latest JAR or AAR for the given dependency
+    implementation("com.android:library-controls:${rootProject['library_d.version']}-firebase-support-notify-support-${rootProject['library_e.version']}@aar")
 }
 
 some_other_stuff {

@@ -14,7 +14,7 @@ private const val PLUGIN_VERSION = "1.0"
 
 fun main(args: Array<String>) = try {
     Telemetry.log("Starting GreenCat v$PLUGIN_VERSION...\n")
-    Telemetry.isVerbose = false
+    Telemetry.isVerbose = true
 
     val startTime = System.currentTimeMillis()
     val configuration = readPluginConfiguration()

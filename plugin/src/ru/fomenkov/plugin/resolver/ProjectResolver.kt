@@ -92,6 +92,7 @@ class ProjectResolver(
 
                 } else if (insideDepsBlock) {
                     val dependency = when {
+                        line.hasFileTreeImplementationPrefix() -> null // Ignore fileTree declaration for a while
                         line.hasFilesImplementationPrefix() || line.hasFilesApiPrefix() -> {
                             parseFilesDependency(modulePath, line)
                         }
@@ -177,7 +178,9 @@ class ProjectResolver(
         val extractVersion = { line: String ->
             val lastColonIndex = line.lastIndexOf(":")
             line.substring(lastColonIndex + 1, line.length).run {
-                split("'").find(::isVersionOrPlaceholder) ?: error("[Library dependency] Failed to extract version: $line")
+                split("'").map { part ->
+                    part.replace("@aar", "")
+                }.find(::isVersionOrPlaceholder) ?: error("[Library dependency] Failed to extract version: $line")
             }
         }
         val artifact: String
@@ -205,17 +208,21 @@ class ProjectResolver(
 
             } else if (line.contains("rootProject")) {
                 val parts = line.split("rootProject")
-
-                if (parts.size != 2) {
-                    error("[Library dependency] Failed to parse line: $line")
-                }
                 val left = parts[0]
                 val right = parts[1]
                 // TODO: improve and check for errors
                 artifact = left.substring(left.indexOf("'") + 1, left.lastIndexOf(":"))
-                val start = right.indexOf("'") + 1
-                version = right.substring(start, right.indexOf("'", start))
 
+                version = when (parts.size) {
+                    2 -> {
+                        // TODO: improve and check for errors
+                        val start = right.indexOf("'") + 1
+                        right.substring(start, right.indexOf("'", start))
+                    }
+                    else -> {
+                        "" // Don't parse compound artifact version, just use the latest one
+                    }
+                }
             } else {
                 val startIndex = line.indexOf("'")
                 val endIndex = line.lastIndexOf(":")
@@ -256,6 +263,8 @@ class ProjectResolver(
     private fun String.hasLibraryImplementationPrefix() = collapse().startsWith("implementation")
 
     private fun String.hasLibraryApiPrefix() = collapse().startsWith("api")
+
+    private fun String.hasFileTreeImplementationPrefix() = collapse().startsWith("implementationfileTree")
 
     private companion object {
         const val BUILD_GRADLE_FILE_NAME = "build.gradle"

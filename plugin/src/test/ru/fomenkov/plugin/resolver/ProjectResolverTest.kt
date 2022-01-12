@@ -79,7 +79,11 @@ class ProjectResolverTest {
             .assertContainsAndDelete(deps)
         Dependency.Library(artifact = "com.facebook.device.yearclass:yearclass", version = "library_a.version", relation = Relation.API)
             .assertContainsAndDelete(deps)
-        Dependency.Library(artifact = "com.google.android:library", version = "android.library.version", relation = Relation.IMPLEMENTATION)
+        Dependency.Library(artifact = "com.google.android:library", version = "library_c.version", relation = Relation.IMPLEMENTATION)
+            .assertContainsAndDelete(deps)
+        Dependency.Library(artifact = "me.leolin:ShortcutBadger", version = "1.1.22", relation = Relation.IMPLEMENTATION)
+            .assertContainsAndDelete(deps)
+        Dependency.Library(artifact = "com.android:library-controls", version = "", relation = Relation.IMPLEMENTATION)
             .assertContainsAndDelete(deps)
 
         assertTrue(deps.isEmpty(), "Some dependencies are not resolved:\n${formatDepsListMessage(deps)}")
