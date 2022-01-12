@@ -15,5 +15,7 @@ sealed class Dependency {
 
 enum class Relation {
     IMPLEMENTATION,
+    DEBUG_IMPLEMENTATION,
+    COMPILE_ONLY,
     API,
 }

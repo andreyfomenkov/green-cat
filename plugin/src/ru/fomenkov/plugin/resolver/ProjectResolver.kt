@@ -96,7 +96,10 @@ class ProjectResolver(
                         line.hasFilesImplementationPrefix() || line.hasFilesApiPrefix() -> {
                             parseFilesDependency(modulePath, line)
                         }
-                        line.hasProjectImplementationPrefix() || line.hasProjectApiPrefix() -> {
+                        line.hasProjectImplementationPrefix() ||
+                                line.hasProjectDebugImplementationPrefix() ||
+                                line.hasProjectApiPrefix() ||
+                                line.hasProjectCompileOnlyPrefix() -> {
                             parseModuleDependency(line)
                         }
                         line.hasLibraryImplementationPrefix() || line.hasLibraryApiPrefix() -> {
@@ -163,7 +166,15 @@ class ProjectResolver(
         }
         val moduleName = line.substring(startIndex + 2, endIndex).replace(":", "/")
         return when {
-            line.hasProjectImplementationPrefix() -> Dependency.Project(moduleName = moduleName, relation = Relation.IMPLEMENTATION)
+            line.hasProjectImplementationPrefix() -> {
+                Dependency.Project(moduleName = moduleName, relation = Relation.IMPLEMENTATION)
+            }
+            line.hasProjectDebugImplementationPrefix() -> {
+                Dependency.Project(moduleName = moduleName, relation = Relation.DEBUG_IMPLEMENTATION)
+            }
+            line.hasProjectCompileOnlyPrefix() -> {
+                Dependency.Project(moduleName = moduleName, relation = Relation.COMPILE_ONLY)
+            }
             line.hasProjectApiPrefix() -> Dependency.Project(moduleName = moduleName, relation = Relation.API)
             else -> null
         }
@@ -252,19 +263,26 @@ class ProjectResolver(
     // TODO: need to optimize
     private fun String.collapse() = replace(" ", "").replace("(", "").trim()
 
+    // Files
     private fun String.hasFilesImplementationPrefix() = collapse().startsWith("implementationfiles")
 
     private fun String.hasFilesApiPrefix() = collapse().startsWith("apifiles")
 
+    private fun String.hasFileTreeImplementationPrefix() = collapse().startsWith("implementationfileTree")
+
+    // Project
     private fun String.hasProjectImplementationPrefix() = collapse().startsWith("implementationproject")
+
+    private fun String.hasProjectDebugImplementationPrefix() = collapse().startsWith("debugImplementationproject")
 
     private fun String.hasProjectApiPrefix() = collapse().startsWith("apiproject")
 
+    private fun String.hasProjectCompileOnlyPrefix() = collapse().startsWith("compileOnlyproject")
+
+    // Library
     private fun String.hasLibraryImplementationPrefix() = collapse().startsWith("implementation")
 
     private fun String.hasLibraryApiPrefix() = collapse().startsWith("api")
-
-    private fun String.hasFileTreeImplementationPrefix() = collapse().startsWith("implementationfileTree")
 
     private companion object {
         const val BUILD_GRADLE_FILE_NAME = "build.gradle"

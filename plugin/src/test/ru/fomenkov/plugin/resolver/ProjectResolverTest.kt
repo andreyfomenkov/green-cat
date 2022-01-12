@@ -67,6 +67,10 @@ class ProjectResolverTest {
             .assertContainsAndDelete(deps)
         Dependency.Project(moduleName = "module-3", relation = Relation.API)
             .assertContainsAndDelete(deps)
+        Dependency.Project(moduleName = "module-4", relation = Relation.DEBUG_IMPLEMENTATION)
+            .assertContainsAndDelete(deps)
+        Dependency.Project(moduleName = "module-5", relation = Relation.COMPILE_ONLY)
+            .assertContainsAndDelete(deps)
 
         // Libs
         Dependency.Library(artifact = "com.google.guava:guava", version = "19.0", relation = Relation.API)

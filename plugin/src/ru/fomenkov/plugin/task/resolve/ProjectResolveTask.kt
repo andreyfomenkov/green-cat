@@ -95,15 +95,15 @@ class ProjectResolveTask(
         // commons-persist
         //
 
-        graph.forEach { module ->
-            val name = module.name
-            val children = moduleChildProjects[name] ?: mutableSetOf()
-            val parents = moduleParentProjects[name] ?: mutableSetOf()
-
-            Telemetry.log("\n### Module: $name, children: ${children.size}, parents: ${parents.size}")
-            children.forEach { name -> Telemetry.log("[CHILD] $name") }
-            parents.forEach { name -> Telemetry.log("[PARENT] $name") }
-        }
+//        graph.forEach { module ->
+//            val name = module.name
+//            val children = moduleChildProjects[name] ?: mutableSetOf()
+//            val parents = moduleParentProjects[name] ?: mutableSetOf()
+//
+//            Telemetry.log("\n### Module: $name, children: ${children.size}, parents: ${parents.size}")
+//            children.forEach { name -> Telemetry.log("[CHILD] $name") }
+//            parents.forEach { name -> Telemetry.log("[PARENT] $name") }
+//        }
         ////////
         return ProjectGraph(graph)
     }

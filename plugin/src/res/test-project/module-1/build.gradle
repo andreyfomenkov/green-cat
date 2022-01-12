@@ -13,6 +13,8 @@ dependencies {
     implementation  project (":module-6")
     api project ":module-7"
     api  project  ':module-3'
+    debugImplementation project(':module-4')
+    compileOnly   project(':module-5')
 
     // Libs
     api ('com.google.guava:guava:19.0')
