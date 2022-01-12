@@ -6,6 +6,7 @@ import ru.fomenkov.plugin.resolver.ModuleDeclaration
 import ru.fomenkov.plugin.resolver.ProjectResolver
 import ru.fomenkov.plugin.task.Task
 import ru.fomenkov.plugin.util.Telemetry
+import ru.fomenkov.plugin.util.formatMillis
 import java.io.File
 
 class ProjectResolveTask(
@@ -23,8 +24,23 @@ class ProjectResolveTask(
 
         val jars = resolver.findAllJarsInGradleCache(GRADLE_CACHE_PATH)
         val aars = resolver.findAllAarsInGradleCache(GRADLE_CACHE_PATH)
-        Telemetry.verboseLog("Total JARs: ${jars.size}, AARs: ${aars.size} in Gradle cache")
 
+        Telemetry.verboseLog("Total JARs: ${jars.size}, AARs: ${aars.size} in Gradle cache")
+        Telemetry.log("Resolving library versions and JAR/AAR artifacts in Gradle cache")
+        val resolvedLibs = mutableMapOf<String, String>()
+        val cachePaths = mutableMapOf<String, Set<String>>()
+
+        val startTime = System.currentTimeMillis() // TODO: remove
+        moduleDeclarations.forEach { declaration ->
+            val modulePath = declaration.path
+            val deps = resolver.parseModuleBuildGradleFile(modulePath)
+            resolvedLibs += validateAndResolveLibraryVersions(modulePath, deps, properties, moduleDeclarations)
+            cachePaths += getArtifactArchivePaths(resolvedLibs, jars + aars) // TODO: slow! Need to optimize
+        }
+        val endTime = System.currentTimeMillis() // TODO: remove
+        Telemetry.log("Resolving artifacts in ${formatMillis(endTime - startTime)}") // TODO: remove
+
+        Telemetry.log("Parsing module $GRADLE_BUILD_FILE files")
         val graph = mutableSetOf<Module>()
         val moduleDependencies = moduleDeclarations
             .associate { declaration ->
@@ -35,6 +51,7 @@ class ProjectResolveTask(
         val moduleChildProjects = mutableMapOf<String, MutableSet<String>>()
         val moduleParentProjects = mutableMapOf<String, MutableSet<String>>()
 
+        Telemetry.log("Resolving project dependencies")
         moduleDependencies.forEach { (modulePath, deps) ->
             val childProjects = moduleChildProjects[modulePath] ?: mutableSetOf()
 
@@ -51,24 +68,7 @@ class ProjectResolveTask(
             moduleChildProjects[modulePath] = childProjects
         }
 
-//        val moduleLibs = moduleDependencies
-//            .mapValues { (modulePath, deps) ->
-//                val libs = mutableSetOf<Library>()
-//                val versions = validateAndResolveLibraryVersions(modulePath, deps, properties, moduleDeclarations)
-//
-//                deps.forEach { dependency ->
-//                    if (dependency is Dependency.Library) {
-//                        val artifact = dependency.artifact
-//                        libs += Library(
-//                            name = artifact,
-//                            version = checkNotNull(versions[artifact]) { "No version for artifact $artifact" },
-//                            cachePaths = setOf(), // TODO: add
-//                        )
-//                    }
-//                }
-//                libs
-//            }
-//
+        Telemetry.log("Building project dependency graph")
         moduleDeclarations.forEach { declaration ->
             val modulePath = declaration.path
 
@@ -78,23 +78,12 @@ class ProjectResolveTask(
                 children = mutableSetOf(),
                 parents = mutableSetOf(),
                 libraries = mutableSetOf(),
-//                libraries = checkNotNull(moduleLibs[modulePath]) { "No libs provided for module $modulePath" },
             )
         }
 
-        moduleDeclarations.forEach { declaration ->
-            val modulePath = declaration.path
-
-            val deps = resolver.parseModuleBuildGradleFile(modulePath)
-            val resolvedLibs = validateAndResolveLibraryVersions(modulePath, deps, properties, moduleDeclarations)
-            val cachePaths = getArtifactArchivePaths(resolvedLibs, jars + aars)
-        }
-        ////////
-
-        // commons-persist
-        //
-
+        // TODO: for debugging purposes
 //        graph.forEach { module ->
+//            // Check commons-persist!
 //            val name = module.name
 //            val children = moduleChildProjects[name] ?: mutableSetOf()
 //            val parents = moduleParentProjects[name] ?: mutableSetOf()
@@ -103,7 +92,7 @@ class ProjectResolveTask(
 //            children.forEach { name -> Telemetry.log("[CHILD] $name") }
 //            parents.forEach { name -> Telemetry.log("[PARENT] $name") }
 //        }
-        ////////
+        // TODO: remove
         return ProjectGraph(graph)
     }
 
@@ -142,17 +131,12 @@ class ProjectResolveTask(
                     jarPaths = archivePaths.filter { jar -> jar.contains(versionPath) }.toSet()
 
                     if (jarPaths.isNotEmpty()) {
-                        Telemetry.log("Fallback version: $artifact ($version -> $fallbackVersion)")
+                        Telemetry.verboseLog("Fallback version: $artifact ($version -> $fallbackVersion)")
                     }
                 }
             }
             if (jarPaths.isEmpty()) {
                 Telemetry.err("No JARs / AARs found in Gradle cache for artifact: $artifact ($version)")
-            }
-            jarPaths.forEach { path ->
-                if (!File(path).exists()) {
-                    error("Resource doesn't exist: $path")
-                }
             }
             resolvedPaths += artifact to jarPaths
         }
