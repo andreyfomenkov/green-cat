@@ -18,5 +18,7 @@ plugin/.idea/*.iws
 plugin/*.zip
 plugin/greencat.properties
 
+hs_err_*
+
 .DS_Store
 .idea

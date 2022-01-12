@@ -174,12 +174,21 @@ class ProjectResolver(
             line.hasLibraryApiPrefix() -> Relation.API
             else -> return null
         }
-        val artifact = line.run {
+        val extractVersion = { line: String ->
+            val lastColonIndex = line.lastIndexOf(":")
+            line.substring(lastColonIndex + 1, line.length).run {
+                split("'").find(::isVersionOrPlaceholder) ?: error("[Library dependency] Failed to extract version: $line")
+            }
+        }
+        val artifact: String
+        val version: String
+
+        line.run {
             if (line.contains("group:") && contains("name:") && contains("version:")) {
                 val parts = line.split(",")
 
                 if (parts.size != 3) {
-                    error("[Library dependency] Failed to parse line: $line\"")
+                    error("[Library dependency] Failed to parse line: $line")
                 }
                 val group = parts[0].let {
                     val startIndex = it.indexOf("'")
@@ -191,15 +200,22 @@ class ProjectResolver(
                     val endIndex = it.lastIndexOf("'")
                     it.substring(startIndex + 1, endIndex)
                 }
-                "$group:$name"
-//            } else if (line.replace(" ", "").contains("rootProject")) { // TODO: refactor
-//                val parts = line.split("rootProject")
-//
-//                if (parts.size != 2) {
-//                    error("[Library dependency] Failed to parse line: $line")
-//                }
-//                val first = parts[0]
-//                first.substring(first.indexOf("'") + 1, first.lastIndexOf(":"))
+                artifact = "$group:$name"
+                version = extractVersion(line)
+
+            } else if (line.contains("rootProject")) {
+                val parts = line.split("rootProject")
+
+                if (parts.size != 2) {
+                    error("[Library dependency] Failed to parse line: $line")
+                }
+                val left = parts[0]
+                val right = parts[1]
+                // TODO: improve and check for errors
+                artifact = left.substring(left.indexOf("'") + 1, left.lastIndexOf(":"))
+                val start = right.indexOf("'") + 1
+                version = right.substring(start, right.indexOf("'", start))
+
             } else {
                 val startIndex = line.indexOf("'")
                 val endIndex = line.lastIndexOf(":")
@@ -207,19 +223,10 @@ class ProjectResolver(
                 if (startIndex == -1 || endIndex == -1) {
                     error("[Library dependency] Failed to parse line: $line")
                 }
-                substring(startIndex + 1, endIndex)
+                artifact = substring(startIndex + 1, endIndex)
+                version = extractVersion(line)
             }
         }
-        val lastColonIndex = line.lastIndexOf(":")
-        val version = line.substring(lastColonIndex + 1, line.length).run {
-            val part = split("'").find(::isVersionOrPlaceholder) ?: return null
-            part
-        }
-        /////////////
-        if (line.replace(" ", "").contains("storekeeper")) {
-            println()
-        }
-        /////////////
         return Dependency.Library(artifact = artifact, version = version, relation = relation)
     }
 
@@ -228,7 +235,7 @@ class ProjectResolver(
             return false
         }
         part.forEach { c ->
-            if (c != '.' && c != '-' && !c.isLetterOrDigit()) {
+            if (c != '.' && c != '-' && c != '_' && !c.isLetterOrDigit()) { // TODO: improve
                 return false
             }
         }

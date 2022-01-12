@@ -1,0 +1,28 @@
+some_stuff {
+    // ...
+}
+
+dependencies {
+
+    // Files
+    implementation files('module-1/some-library-2.1.0.jar')
+    api files ("module-1/some-library-2.1.0.jar")
+
+    // Projects
+    implementation project(':module-2')
+    implementation  project (":module-6")
+    api project ":module-7"
+    api  project  ':module-3'
+
+    // Libs
+    api ('com.google.guava:guava:19.0')
+    api 'com.google.android.gms:play-services-cast:16.0.3'
+    implementation "org.jmdns:jmdns:3.5.1"
+    implementation 'ru.ok.android-android2:duration-interval:${rootProject.property("library_b.version")}@aar'
+    api "com.facebook.device.yearclass:yearclass:${rootProject.property("library_a.version")}"
+    implementation("com.google.android:library:" + rootProject["android.library.version"] + ':all')
+}
+
+some_other_stuff {
+    // ...
+}
