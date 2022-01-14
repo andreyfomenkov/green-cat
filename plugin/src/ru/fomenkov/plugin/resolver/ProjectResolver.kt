@@ -12,6 +12,11 @@ class ProjectResolver(
     private val ignoredLibs: Set<String> = emptySet(),
 ) {
 
+    private val unresolvedArtifacts = mutableSetOf<String>()
+
+    /**
+     * Parse Gradle properties file with placeholder to version values
+     */
     fun parseGradleProperties(): Map<String, String> {
         Telemetry.verboseLog("Parsing $propertiesFileName")
         val map = mutableMapOf<String, String>()
@@ -81,45 +86,44 @@ class ProjectResolver(
         Telemetry.verboseLog("Parsing $modulePath/build.gradle")
         val deps = mutableSetOf<Dependency>()
         val path = "$modulePath/$BUILD_GRADLE_FILE_NAME"
-        var insideDepsBlock = false
 
         File(path).readLines()
             .map { line -> line.trim().replace("\"", "'") }
-            .filterNot { line -> line.isBlank() || line.startsWith("#") || line.startsWith("//") }
+            // TODO: refactor
+            .filterNot { line -> line.isBlank() || line.startsWith("#") || line.startsWith("//") || line.startsWith("implementationClass") }
             .forEach { line ->
-                if (!insideDepsBlock && line.startsWith(DEPENDENCIES_BLOCK_START)) {
-                    insideDepsBlock = true
 
-                } else if (insideDepsBlock && line.startsWith(DEPENDENCIES_BLOCK_END)) {
-                    insideDepsBlock = false
+                ///////
+                if (line.startsWith("project.ext")) {
+                    Telemetry.log(">>>>>>>>>>>>>>>>>>>>> $line")
+                }
+                ///////
 
-                } else if (insideDepsBlock) {
-                    val dependency = when {
-                        line.hasFileTreeImplementationPrefix() -> null // Ignore fileTree declaration for a while
-                        line.hasFilesImplementationPrefix() || line.hasFilesApiPrefix() -> {
-                            parseFilesDependency(modulePath, line)
-                        }
-                        line.hasProjectImplementationPrefix() ||
-                                line.hasProjectDebugImplementationPrefix() ||
-                                line.hasProjectApiPrefix() ||
-                                line.hasProjectCompileOnlyPrefix() ||
-                                line.hasProjectAndroidTestImplementationPrefix() ||
-                                line.hasProjectTestImplementationPrefix() -> {
-                            parseModuleDependency(line)
-                        }
-                        line.hasLibraryImplementationPrefix() ||
-                                line.hasLibraryApiPrefix() ||
-                                line.hasLibraryAndroidTestImplementationPrefix() ||
-                                line.hasLibraryTestImplementationPrefix() -> {
-                            parseLibraryDependency(line)
-                        }
-                        else -> null
+                val dependency = when {
+                    line.hasFileTreeImplementationPrefix() -> null // Ignore fileTree declaration for a while
+                    line.hasFilesImplementationPrefix() || line.hasFilesApiPrefix() -> {
+                        parseFilesDependency(modulePath, line)
                     }
-                    if (dependency != null) {
-                        deps += dependency
-                    } else {
-                        Telemetry.verboseErr("[$path] Skipping line: $line")
+                    line.hasProjectImplementationPrefix() ||
+                            line.hasProjectDebugImplementationPrefix() ||
+                            line.hasProjectApiPrefix() ||
+                            line.hasProjectCompileOnlyPrefix() ||
+                            line.hasProjectAndroidTestImplementationPrefix() ||
+                            line.hasProjectTestImplementationPrefix() -> {
+                        parseModuleDependency(line)
                     }
+                    line.hasLibraryImplementationPrefix() ||
+                            line.hasLibraryApiPrefix() ||
+                            line.hasLibraryAndroidTestImplementationPrefix() ||
+                            line.hasLibraryTestImplementationPrefix() -> {
+                        parseLibraryDependency(line)
+                    }
+                    else -> null
+                }
+                if (dependency != null) {
+                    deps += dependency
+                } else {
+                    Telemetry.verboseErr("[$path] Skipping line: $line")
                 }
             }
         return deps
@@ -244,7 +248,12 @@ class ProjectResolver(
                 val versions = artifacts[artifact]
 
                 if (versions == null) {
-                    Telemetry.err("No JARs / AARs found in Gradle cache for artifact: $artifact ($version)")
+                    val entry = "$artifact ($version)"
+
+                    if (!unresolvedArtifacts.contains(entry)) {
+                        unresolvedArtifacts += entry
+                        Telemetry.err("No JARs / AARs found in Gradle cache for artifact: $artifact ($version)")
+                    }
                 } else if (version.isBlank()) {
                     val latestVersion = versions.keys.maxOrNull()
                     val paths = checkNotNull(versions[latestVersion]) { "No paths for version $version" }
@@ -266,7 +275,7 @@ class ProjectResolver(
         }
     }
 
-    private fun isIgnoredModule(moduleName: String) = ignoredModules.contains(moduleName)
+    fun isIgnoredModule(moduleName: String) = ignoredModules.contains(moduleName)
 
     private fun isIgnoredLib(artifact: String) = ignoredLibs.contains(artifact)
 
@@ -457,6 +466,5 @@ class ProjectResolver(
     private companion object {
         const val BUILD_GRADLE_FILE_NAME = "build.gradle"
         const val DEPENDENCIES_BLOCK_START = "dependencies"
-        const val DEPENDENCIES_BLOCK_END = "}"
     }
 }
