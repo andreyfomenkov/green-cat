@@ -14,16 +14,19 @@ private const val PLUGIN_VERSION = "1.0"
 
 fun main(args: Array<String>) = try {
     Telemetry.log("Starting GreenCat v$PLUGIN_VERSION...\n")
-    Telemetry.isVerbose = false
-
+    Telemetry.isVerbose = true
     val startTime = System.currentTimeMillis()
+    launch()
+    val endTime = System.currentTimeMillis()
+    Telemetry.log("Execution complete in ${formatMillis(endTime - startTime)}")
+
+} catch (error: Throwable) {
+    Telemetry.err("Error (${error.message})")
+}
+
+private fun launch() {
     val configuration = readPluginConfiguration()
     val graph = resolveProjectGraph(configuration)
-    val endTime = System.currentTimeMillis()
-
-    Telemetry.log("\nComplete in ${formatMillis(endTime - startTime)}")
-} catch (error: Throwable) {
-    Telemetry.err("\nError (${error.message})")
 }
 
 private fun readPluginConfiguration() = ReadPluginConfigTask(

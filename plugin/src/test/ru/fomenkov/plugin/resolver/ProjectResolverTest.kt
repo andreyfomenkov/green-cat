@@ -2,8 +2,11 @@ package ru.fomenkov.plugin.resolver
 
 import org.junit.jupiter.api.Test
 import ru.fomenkov.plugin.util.fromResources
+import ru.fomenkov.plugin.util.isVersionGreaterOrEquals
+import java.io.File
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class ProjectResolverTest {
@@ -71,6 +74,10 @@ class ProjectResolverTest {
             .assertContainsAndDelete(deps)
         Dependency.Project(moduleName = "module-5", relation = Relation.COMPILE_ONLY)
             .assertContainsAndDelete(deps)
+        Dependency.Project(moduleName = "module-2", relation = Relation.TEST_IMPLEMENTATION)
+            .assertContainsAndDelete(deps)
+        Dependency.Project(moduleName = "module-3", relation = Relation.ANDROID_TEST_IMPLEMENTATION)
+            .assertContainsAndDelete(deps)
 
         // Libs
         Dependency.Library(artifact = "com.google.guava:guava", version = "19.0", relation = Relation.API)
@@ -89,8 +96,161 @@ class ProjectResolverTest {
             .assertContainsAndDelete(deps)
         Dependency.Library(artifact = "com.android:library-controls", version = "", relation = Relation.IMPLEMENTATION)
             .assertContainsAndDelete(deps)
+        Dependency.Library(artifact = "com.google.guava:guava", version = "project.ext.guavaVersion", relation = Relation.TEST_IMPLEMENTATION)
+            .assertContainsAndDelete(deps)
+        Dependency.Library(artifact = "junit:junit", version = "junit.version", relation = Relation.TEST_IMPLEMENTATION)
+            .assertContainsAndDelete(deps)
+        Dependency.Library(artifact = "org.robolectric:robolectric", version = "robolectric.version", relation = Relation.ANDROID_TEST_IMPLEMENTATION)
+            .assertContainsAndDelete(deps)
+        Dependency.Library(artifact = "org.apache.commons:commons-lang3", version = "3.4", relation = Relation.ANDROID_TEST_IMPLEMENTATION)
+            .assertContainsAndDelete(deps)
+        Dependency.Library(artifact = "com.android:common-api", version = "2.1.456-SNAPSHOT", relation = Relation.ANDROID_TEST_IMPLEMENTATION)
+            .assertContainsAndDelete(deps)
+    }
 
-        assertTrue(deps.isEmpty(), "Some dependencies are not resolved:\n${formatDepsListMessage(deps)}")
+    @Test
+    fun `Test resolve library versions from placeholders`() {
+        val versions = resolver.validateAndResolveLibraryVersions(
+            modulePath = fromResources("test-project/module-1"),
+            deps = setOf(
+                Dependency.Library(artifact = "com.library_a", version = "lib_a.version", relation = Relation.DEBUG_IMPLEMENTATION),
+                Dependency.Project(moduleName = "module-2", relation = Relation.DEBUG_IMPLEMENTATION),
+                Dependency.Library(artifact = "com.library_b", version = "0.1.2", relation = Relation.IMPLEMENTATION),
+                Dependency.Project(moduleName = "module-3", relation = Relation.IMPLEMENTATION),
+                Dependency.Library(artifact = "com.library_c", version = "", relation = Relation.COMPILE_ONLY),
+                Dependency.Project(moduleName = "module-4", relation = Relation.COMPILE_ONLY),
+                Dependency.Library(artifact = "com.library_d", version = "lib_d.version", relation = Relation.API),
+                Dependency.Project(moduleName = "module-5", relation = Relation.API),
+            ),
+            properties = mapOf(
+                "lib_a.version" to "1.2.3",
+                "lib_d.version" to "4.5.6",
+                "lib_e.version" to "10.20.30",
+                "lib_f.version" to "40.50.60",
+            ),
+            moduleDeclarations = setOf(
+                ModuleDeclaration(name = "module-2", path = fromResources("test-project/module-2")),
+                ModuleDeclaration(name = "module-3", path = fromResources("test-project/module-3")),
+                ModuleDeclaration(name = "module-4", path = fromResources("test-project/module-4")),
+                ModuleDeclaration(name = "module-5", path = fromResources("test-project/module-5")),
+            ),
+        )
+        assertEquals(4, versions.size, "Expecting 4 libraries with resolved versions")
+        assertEquals("1.2.3", versions["com.library_a"])
+        assertEquals("0.1.2", versions["com.library_b"])
+        assertEquals("", versions["com.library_c"]) // Empty value for the artifact last version
+        assertEquals("4.5.6", versions["com.library_d"])
+    }
+
+    @Test
+    fun `Test compare versions`() {
+        assertTrue("1".isVersionGreaterOrEquals("1"))
+        assertTrue("1.0".isVersionGreaterOrEquals("1"))
+        assertTrue("2.0".isVersionGreaterOrEquals("1.0"))
+        assertTrue("2.1".isVersionGreaterOrEquals("2.0"))
+        assertTrue("8.12".isVersionGreaterOrEquals("8.11"))
+        assertTrue("8.12.0".isVersionGreaterOrEquals("8.11.0"))
+        assertTrue("8.12.0".isVersionGreaterOrEquals("8.11.9"))
+        assertTrue("8.12.0".isVersionGreaterOrEquals("8.11.9999999999"))
+        assertFalse("3".isVersionGreaterOrEquals("4"))
+        assertFalse("3.4".isVersionGreaterOrEquals("3.4.1"))
+        assertFalse("3.4.2".isVersionGreaterOrEquals("3.4.3"))
+    }
+
+    @Test
+    fun `Test get single artifact archive paths from Gradle cache`() {
+        // All JARs for artifact "com.google.dagger:dagger" in preloaded Gradle cache:
+        //
+        // .../com.google.dagger/dagger/2.40.1/45790480cd353dffe5ce508dd4158cd46b066612/dagger-2.40.1.jar
+        // .../com.google.dagger/dagger/2.40.1/bfd11bec52269c47134ac54d03eec187ac1cdb2/dagger-2.40.1-javadoc.jar
+        // .../com.google.dagger/dagger/2.40.1/bc9d7272bcf2ad118de657d1b2013470b5328e60/dagger-2.40.1-sources.jar
+        // .../com.google.dagger/dagger/2.28.3/10d83810ef9e19714116ed518896c90c6606d633/dagger-2.28.3.jar
+        // .../com.google.dagger/dagger/2.28.3/ab17752a49d8c92a0d5132538e7861d7b6c47443/dagger-2.28.3-sources.jar
+
+        // Preloaded JAR / AAR paths from Gradle cache
+        var startIndex = 0
+        val dirFrom = "files-2.1"
+        val allPaths = File(fromResources("gradle_cache_paths")).readLines()
+            .map { line ->
+                if (startIndex == 0) {
+                    startIndex = line.indexOf(dirFrom) + dirFrom.length + 1
+                }
+                val parts = line.substring(startIndex, line.length).split("/")
+
+                CacheResource(
+                    pkg = parts[0],
+                    artifact = parts[1],
+                    version = parts[2],
+                    resource = parts[4],
+                    fullPath = line,
+                )
+            }
+            .toSet()
+
+        // 2.40.1 found in Gradle cache -> choose 2.40.1
+        assertArtifactArchivePaths(artifact = "com.google.dagger:dagger", version = "2.40.1", allPaths) {
+            setOf(
+                "/Users/andrey/.gradle/caches/modules-2/files-2.1/com.google.dagger/dagger/2.40.1/45790480cd353dffe5ce508dd4158cd46b066612/dagger-2.40.1.jar",
+                "/Users/andrey/.gradle/caches/modules-2/files-2.1/com.google.dagger/dagger/2.40.1/bfd11bec52269c47134ac54d03eec187ac1cdb2/dagger-2.40.1-javadoc.jar",
+                "/Users/andrey/.gradle/caches/modules-2/files-2.1/com.google.dagger/dagger/2.40.1/bc9d7272bcf2ad118de657d1b2013470b5328e60/dagger-2.40.1-sources.jar",
+            )
+        }
+        // 2.28.3 found in Gradle cache, but have newer -> choose 2.28.3
+        assertArtifactArchivePaths(artifact = "com.google.dagger:dagger", version = "2.28.3", allPaths) {
+            setOf(
+                "/Users/andrey/.gradle/caches/modules-2/files-2.1/com.google.dagger/dagger/2.28.3/10d83810ef9e19714116ed518896c90c6606d633/dagger-2.28.3.jar",
+                "/Users/andrey/.gradle/caches/modules-2/files-2.1/com.google.dagger/dagger/2.28.3/ab17752a49d8c92a0d5132538e7861d7b6c47443/dagger-2.28.3-sources.jar",
+            )
+        }
+        // 1.10.5 not found in Gradle cache -> choose the closest one: 2.28.3
+        assertArtifactArchivePaths(artifact = "com.google.dagger:dagger", version = "1.10.5", allPaths) {
+            setOf(
+                "/Users/andrey/.gradle/caches/modules-2/files-2.1/com.google.dagger/dagger/2.28.3/10d83810ef9e19714116ed518896c90c6606d633/dagger-2.28.3.jar",
+                "/Users/andrey/.gradle/caches/modules-2/files-2.1/com.google.dagger/dagger/2.28.3/ab17752a49d8c92a0d5132538e7861d7b6c47443/dagger-2.28.3-sources.jar",
+            )
+        }
+        // 2.34.4 not found in Gradle cache -> choose the closest one: 2.40.1
+        assertArtifactArchivePaths(artifact = "com.google.dagger:dagger", version = "2.34.4", allPaths) {
+            setOf(
+                "/Users/andrey/.gradle/caches/modules-2/files-2.1/com.google.dagger/dagger/2.40.1/45790480cd353dffe5ce508dd4158cd46b066612/dagger-2.40.1.jar",
+                "/Users/andrey/.gradle/caches/modules-2/files-2.1/com.google.dagger/dagger/2.40.1/bfd11bec52269c47134ac54d03eec187ac1cdb2/dagger-2.40.1-javadoc.jar",
+                "/Users/andrey/.gradle/caches/modules-2/files-2.1/com.google.dagger/dagger/2.40.1/bc9d7272bcf2ad118de657d1b2013470b5328e60/dagger-2.40.1-sources.jar",
+            )
+        }
+        // Empty version means any version from Gradle cache -> choose the latest one: 2.40.1
+        assertArtifactArchivePaths(artifact = "com.google.dagger:dagger", version = "", allPaths) {
+            setOf(
+                "/Users/andrey/.gradle/caches/modules-2/files-2.1/com.google.dagger/dagger/2.40.1/45790480cd353dffe5ce508dd4158cd46b066612/dagger-2.40.1.jar",
+                "/Users/andrey/.gradle/caches/modules-2/files-2.1/com.google.dagger/dagger/2.40.1/bfd11bec52269c47134ac54d03eec187ac1cdb2/dagger-2.40.1-javadoc.jar",
+                "/Users/andrey/.gradle/caches/modules-2/files-2.1/com.google.dagger/dagger/2.40.1/bc9d7272bcf2ad118de657d1b2013470b5328e60/dagger-2.40.1-sources.jar",
+            )
+        }
+        // 4.0.0 not found in Gradle cache -> choose the closest one: 2.40.1
+        assertArtifactArchivePaths(artifact = "com.google.dagger:dagger", version = "4.0.0", allPaths) {
+            setOf(
+                "/Users/andrey/.gradle/caches/modules-2/files-2.1/com.google.dagger/dagger/2.40.1/45790480cd353dffe5ce508dd4158cd46b066612/dagger-2.40.1.jar",
+                "/Users/andrey/.gradle/caches/modules-2/files-2.1/com.google.dagger/dagger/2.40.1/bfd11bec52269c47134ac54d03eec187ac1cdb2/dagger-2.40.1-javadoc.jar",
+                "/Users/andrey/.gradle/caches/modules-2/files-2.1/com.google.dagger/dagger/2.40.1/bc9d7272bcf2ad118de657d1b2013470b5328e60/dagger-2.40.1-sources.jar",
+            )
+        }
+        // 8.9.4 not found in Gradle cache -> choose the closest one: 8.12.30
+        assertArtifactArchivePaths(artifact = "com.googlecode.libphonenumber:libphonenumber", version = "8.9.4", allPaths) {
+            setOf(
+                "/Users/andrey/.gradle/caches/modules-2/files-2.1/com.googlecode.libphonenumber/libphonenumber/8.12.30/54fa9f1ab2e8c8ce1417424fc4ed95ff7c9ebfb/libphonenumber-8.12.30.jar",
+                "/Users/andrey/.gradle/caches/modules-2/files-2.1/com.googlecode.libphonenumber/libphonenumber/8.12.30/58c7b42d217f06712837c34972a8a78e6968ce6b/libphonenumber-8.12.30-sources.jar",
+                "/Users/andrey/.gradle/caches/modules-2/files-2.1/com.googlecode.libphonenumber/libphonenumber/8.12.30/877a19cebba1bcc0f015acd5ad4e0bbb05b9059e/libphonenumber-8.12.30-javadoc.jar",
+            )
+        }
+    }
+
+    private fun assertArtifactArchivePaths(artifact: String, version: String, allPaths: Set<CacheResource>, expectedPaths: () -> Set<String>) {
+        val cachePaths = mutableMapOf<String, Set<String>>()
+        resolver.getArtifactArchivePaths(
+            resolvedLibs = mapOf(artifact to version),
+            cacheResources = allPaths,
+            cachePaths = cachePaths,
+        )
+        assertEquals(expectedPaths(), cachePaths[artifact])
     }
 
     private fun formatDepsListMessage(deps: Set<Dependency>) = StringBuilder().apply {

@@ -15,6 +15,8 @@ dependencies {
     api  project  ':module-3'
     debugImplementation project(':module-4')
     compileOnly   project(':module-5')
+    testImplementation  project(":module-2")
+    androidTestImplementation   project(':module-3')
 
     // Libs
     api ('com.google.guava:guava:19.0')
@@ -27,6 +29,11 @@ dependencies {
     implementation "me.leolin:ShortcutBadger:1.1.22@aar"
     // Don't parse compound version, use the latest JAR or AAR for the given dependency
     implementation("com.android:library-controls:${rootProject['library_d.version']}-firebase-support-notify-support-${rootProject['library_e.version']}@aar")
+    testImplementation "com.google.guava:guava:${project.ext.guavaVersion}"
+    testImplementation 'junit:junit:' + rootProject['junit.version']
+    androidTestImplementation 'org.robolectric:robolectric:' + rootProject['robolectric.version']
+    androidTestImplementation 'org.apache.commons:commons-lang3:3.4'
+    androidTestImplementation (group: 'com.android', name: 'common-api', version: '2.1.456-SNAPSHOT', classifier: 'client')
 }
 
 some_other_stuff {

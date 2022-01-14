@@ -171,8 +171,8 @@ public class Main {
                                             String appPackage, String launcherActivity) {
         TaskExecutor.Result result = TaskExecutor.create(null)
                 .add(new DexTask(androidSdkPath, dexDir))
-//                .add(new DeployTask(androidSdkPath, dexDir.getAbsolutePath(), deployPath))
-//                .add(new RestartAppTask(androidSdkPath, appPackage, launcherActivity))
+                .add(new DeployTask(androidSdkPath, dexDir.getAbsolutePath(), deployPath))
+                .add(new RestartAppTask(androidSdkPath, appPackage, launcherActivity))
                 .execute();
         return result.status == ExecutionStatus.SUCCESS;
     }

@@ -18,7 +18,7 @@ abstract class Task<I, O>(private val input: I) {
         val startTime = System.currentTimeMillis()
         val result = task()
         val endTime = System.currentTimeMillis()
-        Telemetry.log("[${javaClass.simpleName}] Complete in ${formatMillis(endTime - startTime)}")
+        Telemetry.log("[${javaClass.simpleName}] Complete in ${formatMillis(endTime - startTime)}\n")
         return result
     }
 }

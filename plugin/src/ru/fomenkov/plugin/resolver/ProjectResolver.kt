@@ -2,11 +2,14 @@ package ru.fomenkov.plugin.resolver
 
 import ru.fomenkov.plugin.util.Telemetry
 import ru.fomenkov.plugin.util.exec
+import ru.fomenkov.plugin.util.isVersionGreaterOrEquals
 import java.io.File
 
 class ProjectResolver(
     private val propertiesFileName: String,
     private val settingsFileName: String,
+    private val ignoredModules: Set<String> = emptySet(),
+    private val ignoredLibs: Set<String> = emptySet(),
 ) {
 
     fun parseGradleProperties(): Map<String, String> {
@@ -99,10 +102,15 @@ class ProjectResolver(
                         line.hasProjectImplementationPrefix() ||
                                 line.hasProjectDebugImplementationPrefix() ||
                                 line.hasProjectApiPrefix() ||
-                                line.hasProjectCompileOnlyPrefix() -> {
+                                line.hasProjectCompileOnlyPrefix() ||
+                                line.hasProjectAndroidTestImplementationPrefix() ||
+                                line.hasProjectTestImplementationPrefix() -> {
                             parseModuleDependency(line)
                         }
-                        line.hasLibraryImplementationPrefix() || line.hasLibraryApiPrefix() -> {
+                        line.hasLibraryImplementationPrefix() ||
+                                line.hasLibraryApiPrefix() ||
+                                line.hasLibraryAndroidTestImplementationPrefix() ||
+                                line.hasLibraryTestImplementationPrefix() -> {
                             parseLibraryDependency(line)
                         }
                         else -> null
@@ -117,27 +125,150 @@ class ProjectResolver(
         return deps
     }
 
-    fun findAllJarsInGradleCache(path: String): Set<String> {
-        Telemetry.verboseLog("Get all JARs in Gradle cache")
-
-        val jars = exec("find $path -name '*.jar'")
-            .filter { line -> line.trim().endsWith(".jar") }
-        if (jars.isEmpty()) {
-            error("No .jar files found in directory: $path")
+    /**
+     * @param path Gradle cache root path
+     * @param extension resource extension (usually JAR or AAR) without leading dot
+     */
+    fun findAllResourcesInGradleCache(path: String, extension: String): Set<CacheResource> {
+        Telemetry.verboseLog("Get all .$extension files in Gradle cache")
+        val homeDir = exec("echo ~").first()
+        if (homeDir.isBlank()) {
+            error("Failed to parse home directory")
         }
-        return jars.toSet()
+        val fullPath = path.replace("~", homeDir)
+        val resources = mutableSetOf<CacheResource>()
+
+        exec("find $path -name '*.$extension'")
+            .filter { line -> line.trim().endsWith(".$extension") }
+            .forEach { line ->
+                val parts = line.substring(fullPath.length + 1, line.length).split("/")
+                if (parts.size != 5) {
+                    error("[Gradle cache] Failed to parse path: $line")
+                }
+                resources += CacheResource(
+                    pkg = parts[0],
+                    artifact = parts[1],
+                    version = parts[2],
+                    resource = parts[4],
+                    fullPath = line,
+                )
+            }
+        return resources
     }
 
-    fun findAllAarsInGradleCache(path: String): Set<String> {
-        Telemetry.verboseLog("Get all AARs in Gradle cache")
-
-        val aars = exec("find $path -name '*.aar'")
-            .filter { line -> line.trim().endsWith(".aar") }
-        if (aars.isEmpty()) {
-            error("No .aar files found in directory: $path")
+    /**
+     * Parse module info and return library artifacts mapped to the
+     * appropriate resolved versions instead of placeholders
+     */
+    fun validateAndResolveLibraryVersions(
+        modulePath: String,
+        deps: Set<Dependency>,
+        properties: Map<String, String>,
+        moduleDeclarations: Set<ModuleDeclaration>,
+    ): Map<String, String> {
+        Telemetry.verboseLog("[$modulePath] Validating module declarations")
+        moduleDeclarations.forEach { declaration ->
+            val path = "${declaration.path}/$BUILD_GRADLE_FILE_NAME"
+            if (!File(path).exists()) {
+                error("File not found: $path")
+            }
         }
-        return aars.toSet()
+        Telemetry.verboseLog("[$modulePath] Resolving module dependencies")
+        val moduleNames = moduleDeclarations.map { declaration -> declaration.name }.toSet()
+        val resolvedLibs = mutableMapOf<String, String>()
+
+        deps.forEach { dependency ->
+            when (dependency) {
+                is Dependency.Files -> {
+                    val path = dependency.modulePath + "/" + dependency.filePath
+                    if (!File(path).exists()) {
+                        error("Local file dependency not found: $path")
+                    }
+                }
+                is Dependency.Project -> {
+                    val moduleName = dependency.moduleName
+
+                    if (!isIgnoredModule(moduleName) && !moduleNames.contains(moduleName)) {
+                        error("Module '${dependency.moduleName}' declaration not found")
+                    }
+                }
+                is Dependency.Library -> {
+                    val artifact = dependency.artifact
+
+                    if (!isIgnoredLib(artifact)) {
+                        val placeholderOrVersion = dependency.version
+                        val version = when {
+                            placeholderOrVersion.isBlank() -> "" // Use the latest artifact version (workaround for compound version)
+                            isVersionResolved(placeholderOrVersion) -> placeholderOrVersion
+                            else -> properties[placeholderOrVersion]
+                        }
+                        if (version == null) {
+                            Telemetry.err("[$modulePath] No placeholder version: $placeholderOrVersion for $modulePath")
+                        } else {
+                            resolvedLibs += artifact to version
+                        }
+                    }
+                }
+            }
+        }
+        Telemetry.verboseLog("[$modulePath] Validation is OK")
+        return resolvedLibs
     }
+
+    /**
+     * @param resolvedLibs map of artifact to resolved versions
+     * @param cacheResources all JAR / AAR resources in Gradle cache
+     * @param cachePaths output map for artifacts to their archive paths in Gradle cache
+     */
+    fun getArtifactArchivePaths(
+        resolvedLibs: Map<String, String>,
+        cacheResources: Set<CacheResource>,
+        cachePaths: MutableMap<String, Set<String>>,
+    ) {
+        // Artifact mapped to existing versions. In turn each version maps to the actual JAR / AAR paths
+        val artifacts = mutableMapOf<String, MutableMap<String, MutableSet<String>>>() // TODO: refactor
+        val fullPaths = mutableSetOf<String>()
+
+        cacheResources.forEach { res ->
+            val fullArtifactId = "${res.pkg}:${res.artifact}"
+            val versions = artifacts[fullArtifactId] ?: mutableMapOf()
+            val paths = versions[res.version] ?: mutableSetOf()
+
+            paths += res.fullPath
+            versions[res.version] = paths
+            artifacts[fullArtifactId] = versions
+            fullPaths += res.fullPath
+        }
+        resolvedLibs.forEach { (artifact, version) ->
+            if (!cachePaths.containsKey(artifact)) {
+                val versions = artifacts[artifact]
+
+                if (versions == null) {
+                    Telemetry.err("No JARs / AARs found in Gradle cache for artifact: $artifact ($version)")
+                } else if (version.isBlank()) {
+                    val latestVersion = versions.keys.maxOrNull()
+                    val paths = checkNotNull(versions[latestVersion]) { "No paths for version $version" }
+                    cachePaths += artifact to paths
+                } else {
+                    var paths = versions[version]
+
+                    if (paths == null) {
+                        val latestVersion = versions.keys.maxOrNull()
+                        val fallbackVersion = versions.keys.lastOrNull { it.isVersionGreaterOrEquals(version) } ?: latestVersion
+                        checkNotNull(fallbackVersion) { "Fallback version is null for artifact $artifact:$version" }
+                        paths = checkNotNull(versions[fallbackVersion]) { "No paths for version $version" }
+                        cachePaths += artifact to paths
+                    } else {
+                        cachePaths += artifact to paths
+                    }
+                }
+            }
+        }
+    }
+
+    private fun isIgnoredModule(moduleName: String) = ignoredModules.contains(moduleName)
+
+    private fun isIgnoredLib(artifact: String) = ignoredLibs.contains(artifact)
 
     private fun parseFilesDependency(modulePath: String, line: String): Dependency? {
         if (line.count { char -> char == '\'' } != 2) {
@@ -175,7 +306,15 @@ class ProjectResolver(
             line.hasProjectCompileOnlyPrefix() -> {
                 Dependency.Project(moduleName = moduleName, relation = Relation.COMPILE_ONLY)
             }
-            line.hasProjectApiPrefix() -> Dependency.Project(moduleName = moduleName, relation = Relation.API)
+            line.hasProjectApiPrefix() -> {
+                Dependency.Project(moduleName = moduleName, relation = Relation.API)
+            }
+            line.hasProjectAndroidTestImplementationPrefix() -> {
+                Dependency.Project(moduleName = moduleName, relation = Relation.ANDROID_TEST_IMPLEMENTATION)
+            }
+            line.hasProjectTestImplementationPrefix() -> {
+                Dependency.Project(moduleName = moduleName, relation = Relation.TEST_IMPLEMENTATION)
+            }
             else -> null
         }
     }
@@ -184,38 +323,47 @@ class ProjectResolver(
         val relation = when {
             line.hasLibraryImplementationPrefix() -> Relation.IMPLEMENTATION
             line.hasLibraryApiPrefix() -> Relation.API
+            line.hasLibraryAndroidTestImplementationPrefix() -> Relation.ANDROID_TEST_IMPLEMENTATION
+            line.hasLibraryTestImplementationPrefix() -> Relation.TEST_IMPLEMENTATION
             else -> return null
         }
         val extractVersion = { line: String ->
             val lastColonIndex = line.lastIndexOf(":")
             line.substring(lastColonIndex + 1, line.length).run {
-                split("'").map { part ->
-                    part.replace("@aar", "")
+                split("'")
+                    // TODO: refactor
+                    .map { part ->
+                        if (part.startsWith("\${") && part.endsWith("}")) {
+                            part.substring(part.indexOf("{") + 1, part.indexOf("}"))
+                        } else {
+                            part
+                        }
+                    }
+                    .map { part ->
+                    part.replace("@aar", "") // TODO: refactor
                 }.find(::isVersionOrPlaceholder) ?: error("[Library dependency] Failed to extract version: $line")
             }
         }
         val artifact: String
-        val version: String
+        var version: String? = null
 
         line.run {
             if (line.contains("group:") && contains("name:") && contains("version:")) {
                 val parts = line.split(",")
+                var group: String? = null
+                var name: String? = null
 
-                if (parts.size != 3) {
-                    error("[Library dependency] Failed to parse line: $line")
+                parts.forEach { part ->
+                    when {
+                        part.contains("group:") -> group = part.textInQuotes()
+                        part.contains("name:") -> name = part.textInQuotes()
+                        part.contains("version:") -> version = part.textInQuotes()
+                    }
                 }
-                val group = parts[0].let {
-                    val startIndex = it.indexOf("'")
-                    val endIndex = it.lastIndexOf("'")
-                    it.substring(startIndex + 1, endIndex)
-                }
-                val name = parts[1].let {
-                    val startIndex = it.indexOf("'")
-                    val endIndex = it.lastIndexOf("'")
-                    it.substring(startIndex + 1, endIndex)
-                }
+                checkNotNull(group) { "[Library dependency] Failed to parse parameter 'group' in line: $line" }
+                checkNotNull(name) { "[Library dependency] Failed to parse parameter 'name' in line: $line" }
+                checkNotNull(version) { "[Library dependency] Failed to parse parameter 'version' in line: $line" }
                 artifact = "$group:$name"
-                version = extractVersion(line)
 
             } else if (line.contains("rootProject")) {
                 val parts = line.split("rootProject")
@@ -245,7 +393,9 @@ class ProjectResolver(
                 version = extractVersion(line)
             }
         }
-        return Dependency.Library(artifact = artifact, version = version, relation = relation)
+        checkNotNull(version) { "[Library dependency] Failed to parse parameter 'version' in line: $line" }
+        // TODO: refactor
+        return Dependency.Library(artifact = artifact, version = version!!, relation = relation)
     }
 
     private fun isVersionOrPlaceholder(part: String): Boolean {
@@ -258,6 +408,18 @@ class ProjectResolver(
             }
         }
         return true
+    }
+
+    private fun isVersionResolved(version: String) = version[0].isDigit()
+
+    private fun String.textInQuotes(): String {
+        val startIndex = indexOf("'")
+        val endIndex = lastIndexOf("'")
+        when {
+            startIndex == -1 -> error("No start quote for text: $this")
+            endIndex == -1 -> error("No end quote for text: $this")
+        }
+        return substring(startIndex + 1, endIndex)
     }
 
     // TODO: need to optimize
@@ -279,10 +441,18 @@ class ProjectResolver(
 
     private fun String.hasProjectCompileOnlyPrefix() = collapse().startsWith("compileOnlyproject")
 
+    private fun String.hasProjectAndroidTestImplementationPrefix() = collapse().startsWith("androidTestImplementationproject")
+
+    private fun String.hasProjectTestImplementationPrefix() = collapse().startsWith("testImplementationproject")
+
     // Library
     private fun String.hasLibraryImplementationPrefix() = collapse().startsWith("implementation")
 
     private fun String.hasLibraryApiPrefix() = collapse().startsWith("api")
+
+    private fun String.hasLibraryAndroidTestImplementationPrefix() = collapse().startsWith("androidTestImplementation")
+
+    private fun String.hasLibraryTestImplementationPrefix() = collapse().startsWith("testImplementation")
 
     private companion object {
         const val BUILD_GRADLE_FILE_NAME = "build.gradle"
