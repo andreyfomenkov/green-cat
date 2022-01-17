@@ -20,14 +20,13 @@ class ProjectResolveTask(
             ignoredModules = input.ignoredModules,
             ignoredLibs = input.ignoredLibs,
         )
-        val properties = resolver.parseGradleProperties()
+        val properties = resolver.parseGradleProperties().toMutableMap() // TODO: refactor
         val moduleDeclarations = resolver.parseModuleDeclarations()
         Telemetry.log("Project has ${moduleDeclarations.size} module(s)")
 
-        val jars = resolver.findAllResourcesInGradleCache(GRADLE_CACHE_PATH, "jar")
-        val aars = resolver.findAllResourcesInGradleCache(GRADLE_CACHE_PATH, "aar")
+        val resources = resolver.findAllResourcesInGradleCache(GRADLE_CACHE_PATH)
+        Telemetry.verboseLog("Total ${resources.size} resources in Gradle cache")
 
-        Telemetry.verboseLog("Total JARs: ${jars.size}, AARs: ${aars.size} in Gradle cache")
         Telemetry.log("Resolving library versions and JAR/AAR artifacts in Gradle cache")
         val resolvedLibs = mutableMapOf<String, String>()
         val cachePaths = mutableMapOf<String, Set<String>>()
@@ -38,12 +37,12 @@ class ProjectResolveTask(
         moduleDeclarations.forEach { declaration ->
             resolver.apply {
                 val modulePath = declaration.path
-                val deps = parseModuleBuildGradleFile(modulePath)
+                val deps = parseModuleBuildGradleFile(modulePath, properties)
                 moduleDependencies += modulePath to deps
                 resolvedLibs += validateAndResolveLibraryVersions(modulePath, deps, properties, moduleDeclarations)
                 moduleChildProjects += declaration.path to mutableSetOf()
                 moduleParentProjects += declaration.path to mutableSetOf()
-                getArtifactArchivePaths(resolvedLibs, jars + aars, cachePaths)
+                getArtifactArchivePaths(resolvedLibs, resources, cachePaths)
             }
         }
         Telemetry.log("Parsing module Gradle build files")
@@ -89,16 +88,16 @@ class ProjectResolveTask(
         }
 
         // TODO: for debugging purposes
-        graph.forEach { module ->
-            // Check commons-persist!
-            val name = module.name
-            val children = moduleChildProjects[name] ?: mutableSetOf()
-            val parents = moduleParentProjects[name] ?: mutableSetOf()
-
-            Telemetry.log("\n### Module: $name, children: ${children.size}, parents: ${parents.size}")
-            children.forEach { name -> Telemetry.log("[CHILD] $name") }
-            parents.forEach { name -> Telemetry.log("[PARENT] $name") }
-        }
+//        graph.forEach { module ->
+//            // Check commons-persist!
+//            val name = module.path
+//            val children = checkNotNull(moduleChildProjects[name]) { "No children collection for module: $name" }
+//            val parents = checkNotNull(moduleParentProjects[name]) { "No parents collection for module: $name" }
+//
+//            Telemetry.log("\n### Module: $name, children: ${children.size}, parents: ${parents.size}")
+//            children.forEach { name -> Telemetry.log("[CHILD] $name") }
+//            parents.forEach { name -> Telemetry.log("[PARENT] $name") }
+//        }
         // TODO: remove
         return ProjectGraph(graph)
     }

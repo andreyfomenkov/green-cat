@@ -46,7 +46,8 @@ class ProjectResolverTest {
     @Test
     fun `Test parse build Gradle file for dependencies`() {
         // See ./plugin/src/res/test-project/module-1/build.gradle
-        val deps = resolver.parseModuleBuildGradleFile(modulePath = fromResources("test-project/module-1")).toMutableSet()
+        val properties = mutableMapOf<String, String>() // Not required for this test
+        val deps = resolver.parseModuleBuildGradleFile(modulePath = fromResources("test-project/module-1"), properties).toMutableSet()
 
         // Files
         Dependency.Files(
@@ -106,6 +107,10 @@ class ProjectResolverTest {
             .assertContainsAndDelete(deps)
         Dependency.Library(artifact = "com.android:common-api", version = "2.1.456-SNAPSHOT", relation = Relation.ANDROID_TEST_IMPLEMENTATION)
             .assertContainsAndDelete(deps)
+        Dependency.Library(artifact = "com.android:test-library", version = "1.6.65", relation = Relation.ANDROID_TEST_IMPLEMENTATION)
+            .assertContainsAndDelete(deps)
+
+        assertTrue(deps.isEmpty(), "Collection is not empty. The following item(s) are left:\n${formatDepsListMessage(deps)}")
     }
 
     @Test

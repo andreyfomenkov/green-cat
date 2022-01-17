@@ -34,6 +34,7 @@ dependencies {
     androidTestImplementation 'org.robolectric:robolectric:' + rootProject['robolectric.version']
     androidTestImplementation 'org.apache.commons:commons-lang3:3.4'
     androidTestImplementation (group: 'com.android', name: 'common-api', version: '2.1.456-SNAPSHOT', classifier: 'client')
+    androidTestImplementation ('com.android:test-library:1.6.65:all')
 }
 
 some_other_stuff {

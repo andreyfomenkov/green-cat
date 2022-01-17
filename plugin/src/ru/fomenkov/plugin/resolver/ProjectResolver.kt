@@ -82,7 +82,12 @@ class ProjectResolver(
         return set
     }
 
-    fun parseModuleBuildGradleFile(modulePath: String): Set<Dependency> {
+    // Sometimes property value: 'artifact = version' can be found in build.gradle file
+    // We should add it to main properties collection (properties mutable map)
+    fun parseModuleBuildGradleFile(
+        modulePath: String,
+        properties: MutableMap<String, String>,
+    ): Set<Dependency> {
         Telemetry.verboseLog("Parsing $modulePath/build.gradle")
         val deps = mutableSetOf<Dependency>()
         val path = "$modulePath/$BUILD_GRADLE_FILE_NAME"
@@ -92,13 +97,17 @@ class ProjectResolver(
             // TODO: refactor
             .filterNot { line -> line.isBlank() || line.startsWith("#") || line.startsWith("//") || line.startsWith("implementationClass") }
             .forEach { line ->
-
-                ///////
+                // Property can be found in build.gradle file -> add to main properties collection
                 if (line.startsWith("project.ext")) {
-                    Telemetry.log(">>>>>>>>>>>>>>>>>>>>> $line")
-                }
-                ///////
+                    val parts = line.split("=")
 
+                    if (parts.size != 2) {
+                        error("[$path] Failed to parse property: $line")
+                    }
+                    val artifact = parts[0].trim()
+                    val version = parts[1].replace("\"", "").replace("'", "").trim() // TODO: refactor
+                    properties += artifact to version
+                }
                 val dependency = when {
                     line.hasFileTreeImplementationPrefix() -> null // Ignore fileTree declaration for a while
                     line.hasFilesImplementationPrefix() || line.hasFilesApiPrefix() -> {
@@ -131,10 +140,11 @@ class ProjectResolver(
 
     /**
      * @param path Gradle cache root path
-     * @param extension resource extension (usually JAR or AAR) without leading dot
+     * @return all JAR and AAR resources
      */
-    fun findAllResourcesInGradleCache(path: String, extension: String): Set<CacheResource> {
-        Telemetry.verboseLog("Get all .$extension files in Gradle cache")
+    fun findAllResourcesInGradleCache(path: String): Set<CacheResource> {
+        Telemetry.verboseLog("List all JAR / AAR files in Gradle cache")
+
         val homeDir = exec("echo ~").first()
         if (homeDir.isBlank()) {
             error("Failed to parse home directory")
@@ -142,23 +152,31 @@ class ProjectResolver(
         val fullPath = path.replace("~", homeDir)
         val resources = mutableSetOf<CacheResource>()
 
-        exec("find $path -name '*.$extension'")
-            .filter { line -> line.trim().endsWith(".$extension") }
-            .forEach { line ->
-                val parts = line.substring(fullPath.length + 1, line.length).split("/")
-                if (parts.size != 5) {
-                    error("[Gradle cache] Failed to parse path: $line")
+        File(fullPath).files { packageDir ->
+            packageDir.files { artifactDir ->
+                artifactDir.files { versionDir ->
+                    versionDir.files { hashDir ->
+                        hashDir.files { resourceFile ->
+                            if (resourceFile.extension == "jar" || resourceFile.extension == "aar") {
+                                resources += CacheResource(
+                                    pkg = packageDir.name,
+                                    artifact = artifactDir.name,
+                                    version = versionDir.name,
+                                    resource = resourceFile.name,
+                                    fullPath = resourceFile.path,
+                                )
+                            }
+                        }
+                    }
                 }
-                resources += CacheResource(
-                    pkg = parts[0],
-                    artifact = parts[1],
-                    version = parts[2],
-                    resource = parts[4],
-                    fullPath = line,
-                )
             }
+        }
         return resources
     }
+
+    private fun File.files(action: (File) -> Unit) = checkNotNull(listFiles()) {
+        "Failed to list files for directory: $path"
+    }.forEach(action)
 
     /**
      * Parse module info and return library artifacts mapped to the
@@ -392,14 +410,19 @@ class ProjectResolver(
                     }
                 }
             } else {
-                val startIndex = line.indexOf("'")
-                val endIndex = line.lastIndexOf(":")
+                var cropped = line
+
+                if (cropped.contains(":all'")) {
+                    cropped = cropped.replace(":all", "") // TODO: refactor
+                }
+                val startIndex = cropped.indexOf("'")
+                val endIndex = cropped.lastIndexOf(":")
 
                 if (startIndex == -1 || endIndex == -1) {
                     error("[Library dependency] Failed to parse line: $line")
                 }
                 artifact = substring(startIndex + 1, endIndex)
-                version = extractVersion(line)
+                version = extractVersion(cropped)
             }
         }
         checkNotNull(version) { "[Library dependency] Failed to parse parameter 'version' in line: $line" }
