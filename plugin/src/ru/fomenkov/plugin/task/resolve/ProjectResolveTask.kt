@@ -45,60 +45,59 @@ class ProjectResolveTask(
                 getArtifactArchivePaths(resolvedLibs, resources, cachePaths)
             }
         }
-        Telemetry.log("Parsing module Gradle build files")
-        val graph = mutableSetOf<Module>()
-
         Telemetry.log("Resolving project dependencies")
         val moduleNameToPathMap = moduleDeclarations.associate { declaration -> // TODO: refactor
             declaration.name to declaration.path
         }
-        moduleDependencies.forEach { (modulePath, deps) ->
-            val childProjects = checkNotNull(moduleChildProjects[modulePath]) {
-                "No key for module path $modulePath found in child projects"
-            }
-            deps.forEach { dependency ->
-                if (dependency is Dependency.Project && !resolver.isIgnoredModule(dependency.moduleName)) {
-                    // TODO: refactor
-                    val child = checkNotNull(moduleNameToPathMap[dependency.moduleName]) {
-                        "No module path for name: ${dependency.moduleName}"
-                    }
-                    childProjects += child
-
-                    val parentProjects = checkNotNull(moduleParentProjects[child]) {
-                        "No key for module path $child found in parent projects"
-                    }
-                    parentProjects += modulePath
-                    moduleParentProjects[child] = parentProjects
-                }
-            }
-            moduleChildProjects[modulePath] = childProjects
-        }
-
-        Telemetry.log("Building project dependency graph")
-        moduleDeclarations.forEach { declaration ->
-            val modulePath = declaration.path
-
-            graph += Module(
-                name = declaration.name,
-                path = modulePath,
-                children = mutableSetOf(),
-                parents = mutableSetOf(),
-                libraries = mutableSetOf(),
-            )
-        }
 
         // TODO: for debugging purposes
-//        graph.forEach { module ->
-//            // Check commons-persist!
-//            val name = module.path
-//            val children = checkNotNull(moduleChildProjects[name]) { "No children collection for module: $name" }
-//            val parents = checkNotNull(moduleParentProjects[name]) { "No parents collection for module: $name" }
+        moduleDeclarations.forEach { declaration ->
+            val deps = resolver.getModuleDependencies(
+                modulePath = declaration.path,
+                modules = moduleDependencies,
+                moduleNameToPath = moduleNameToPathMap,
+            )
+            Telemetry.log("# MODULE: ${declaration.path} #")
+            deps.sorted().forEach { path -> Telemetry.log(" - $path") }
+            Telemetry.log("")
+        }
+        //
+
+//        moduleDependencies.forEach { (modulePath, deps) ->
+//            val childProjects = checkNotNull(moduleChildProjects[modulePath]) {
+//                "No key for module path $modulePath found in child projects"
+//            }
+//            deps.forEach { dependency ->
+//                if (dependency is Dependency.Project && !resolver.isIgnoredModule(dependency.moduleName)) {
+//                    // TODO: refactor
+//                    val child = checkNotNull(moduleNameToPathMap[dependency.moduleName]) {
+//                        "No module path for name: ${dependency.moduleName}"
+//                    }
+//                    childProjects += child
 //
-//            Telemetry.log("\n### Module: $name, children: ${children.size}, parents: ${parents.size}")
-//            children.forEach { name -> Telemetry.log("[CHILD] $name") }
-//            parents.forEach { name -> Telemetry.log("[PARENT] $name") }
+//                    val parentProjects = checkNotNull(moduleParentProjects[child]) {
+//                        "No key for module path $child found in parent projects"
+//                    }
+//                    parentProjects += modulePath
+//                    moduleParentProjects[child] = parentProjects
+//                }
+//            }
+//            moduleChildProjects[modulePath] = childProjects
 //        }
-        // TODO: remove
+//        Telemetry.log("Building project dependency graph")
+        val graph = mutableSetOf<Module>()
+//
+//        moduleDeclarations.forEach { declaration ->
+//            val modulePath = declaration.path
+//
+//            graph += Module(
+//                name = declaration.name,
+//                path = modulePath,
+//                children = mutableSetOf(),
+//                parents = mutableSetOf(),
+//                libraries = mutableSetOf(),
+//            )
+//        }
         return ProjectGraph(graph)
     }
 

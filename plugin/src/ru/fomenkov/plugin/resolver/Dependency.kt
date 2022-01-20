@@ -11,13 +11,25 @@ sealed class Dependency {
 
         fun isUseLatestVersion() = version.isBlank()
     }
+
+    // TODO: refactor
+    fun isTransitive() = when (this) {
+        is Files -> relation.isTransitive()
+        is Project -> relation.isTransitive()
+        is Library -> relation.isTransitive()
+    }
 }
 
 enum class Relation {
+    // Non-transitive
     IMPLEMENTATION,
     DEBUG_IMPLEMENTATION,
+    // Transitive
     COMPILE_ONLY,
     API,
+    // Test
     ANDROID_TEST_IMPLEMENTATION,
-    TEST_IMPLEMENTATION,
+    TEST_IMPLEMENTATION;
+
+    fun isTransitive() = this == API || this == COMPILE_ONLY
 }

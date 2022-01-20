@@ -248,6 +248,106 @@ class ProjectResolverTest {
         }
     }
 
+    @Test
+    fun `Test build module dependencies case 1`() {
+        mapOf(
+            "app" to setOf(
+                Dependency.Project(moduleName = "m1", relation = Relation.IMPLEMENTATION),
+            ),
+            "m1" to setOf(
+                Dependency.Project(moduleName = "m2", relation = Relation.API),
+            ),
+            "m2" to setOf(
+                Dependency.Project(moduleName = "m3", relation = Relation.IMPLEMENTATION),
+                Dependency.Project(moduleName = "m4", relation = Relation.IMPLEMENTATION),
+                Dependency.Project(moduleName = "m5", relation = Relation.API),
+            ),
+            "m3" to emptySet(),
+            "m4" to emptySet(),
+            "m5" to emptySet(),
+        ).assertAppModuleChildProjects("m1", "m2", "m5")
+    }
+
+    @Test
+    fun `Test build module dependencies case 2`() {
+        mapOf(
+            "app" to setOf(
+                Dependency.Project(moduleName = "m1", relation = Relation.IMPLEMENTATION),
+            ),
+            "m1" to setOf(
+                Dependency.Project(moduleName = "m2", relation = Relation.IMPLEMENTATION),
+            ),
+            "m2" to setOf(
+                Dependency.Project(moduleName = "m3", relation = Relation.IMPLEMENTATION),
+            ),
+            "m3" to emptySet(),
+        ).assertAppModuleChildProjects("m1")
+    }
+
+    @Test
+    fun `Test build module dependencies case 3`() {
+        mapOf(
+            "app" to setOf(
+                Dependency.Project(moduleName = "m1", relation = Relation.IMPLEMENTATION),
+            ),
+            "m1" to setOf(
+                Dependency.Project(moduleName = "m2", relation = Relation.API),
+            ),
+            "m2" to setOf(
+                Dependency.Project(moduleName = "m3", relation = Relation.IMPLEMENTATION),
+            ),
+            "m3" to emptySet(),
+        ).assertAppModuleChildProjects("m1", "m2")
+    }
+
+    @Test
+    fun `Test build module dependencies case 4`() {
+        mapOf(
+            "app" to setOf(
+                Dependency.Project(moduleName = "m1", relation = Relation.IMPLEMENTATION),
+            ),
+            "m1" to setOf(
+                Dependency.Project(moduleName = "m2", relation = Relation.API),
+            ),
+            "m2" to setOf(
+                Dependency.Project(moduleName = "m3", relation = Relation.API),
+            ),
+            "m3" to emptySet(),
+        ).assertAppModuleChildProjects("m1", "m2", "m3")
+    }
+
+    @Test
+    fun `Test build module dependencies case 5`() {
+        mapOf(
+            "app" to setOf(
+                Dependency.Project(moduleName = "m1", relation = Relation.IMPLEMENTATION),
+            ),
+            "m1" to setOf(
+                Dependency.Project(moduleName = "m2", relation = Relation.IMPLEMENTATION),
+                Dependency.Project(moduleName = "m3", relation = Relation.API),
+            ),
+            "m2" to setOf(
+                Dependency.Project(moduleName = "m3", relation = Relation.API),
+            ),
+            "m3" to setOf(
+                Dependency.Project(moduleName = "m4", relation = Relation.API),
+            ),
+            "m4" to emptySet(),
+        ).assertAppModuleChildProjects("m1", "m3", "m4")
+    }
+
+    private fun Map<String, Set<Dependency.Project>>.assertAppModuleChildProjects(vararg names: String) {
+        assertEquals(
+            expected = names.toSet(),
+            actual = resolver.getModuleDependencies(
+                modulePath = "app", // Always check for 'app' module
+                modules = this,
+                moduleNameToPath = this.keys.associateBy { it }, // Map module name to path for testing
+            ),
+            message = "Module dependencies don's match",
+        )
+    }
+
     private fun assertArtifactArchivePaths(artifact: String, version: String, allPaths: Set<CacheResource>, expectedPaths: () -> Set<String>) {
         val cachePaths = mutableMapOf<String, Set<String>>()
         resolver.getArtifactArchivePaths(
