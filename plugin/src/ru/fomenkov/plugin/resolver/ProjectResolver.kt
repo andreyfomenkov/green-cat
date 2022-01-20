@@ -339,7 +339,31 @@ class ProjectResolver(
         return moduleDeps.map { dep -> getModulePathByName(dep.moduleName) }.toSet()
     }
 
-    fun isIgnoredModule(moduleName: String) = ignoredModules.contains(moduleName)
+    /**
+     * Get compilation order for modules. Modules with the same order value can be compiled concurrently
+     *
+     * @param deps module paths involved into compilation mapped to their module dependencies (including transitive)
+     * @return compilation order mapped to a set of module paths
+     */
+    fun getModuleCompilationOrder(deps: Map<String, Set<String>>): Map<Int, Set<String>> {
+        val allPaths = deps.keys.toMutableSet()
+        val hasChildInAllPaths = { path: String ->
+            val children = checkNotNull(deps[path]) { "Unknown module path: $path" }
+            (allPaths - children).size < allPaths.size
+        }
+        var order = 0
+        val pathOrders = mutableMapOf<Int, Set<String>>()
+
+        while (allPaths.isNotEmpty()) {
+            val nextOrderModules = allPaths.filterNot { path -> hasChildInAllPaths(path) }.toSet()
+            pathOrders += order to nextOrderModules
+            allPaths -= nextOrderModules
+            order++
+        }
+        return pathOrders
+    }
+
+    private fun isIgnoredModule(moduleName: String) = ignoredModules.contains(moduleName)
 
     private fun isIgnoredLib(artifact: String) = ignoredLibs.contains(artifact)
 

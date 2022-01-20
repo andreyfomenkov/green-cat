@@ -336,6 +336,65 @@ class ProjectResolverTest {
         ).assertAppModuleChildProjects("m1", "m3", "m4")
     }
 
+    @Test
+    fun `Test modules compilation order case 1`() {
+        val deps = mapOf(
+            "m1" to setOf("m2"),
+            "m2" to setOf("m3"),
+            "m3" to emptySet(),
+        )
+        assertEquals(
+            expected = mapOf(
+                0 to setOf("m3"),
+                1 to setOf("m2"),
+                2 to setOf("m1"),
+            ),
+            actual = resolver.getModuleCompilationOrder(deps),
+            message = "Unexpected compilation order",
+        )
+    }
+
+    @Test
+    fun `Test modules compilation order case 2`() {
+        val deps = mapOf<String, Set<String>>(
+            "m1" to emptySet(),
+            "m2" to emptySet(),
+            "m3" to emptySet(),
+        )
+        assertEquals(
+            expected = mapOf(
+                0 to setOf("m1", "m2", "m3"),
+            ),
+            actual = resolver.getModuleCompilationOrder(deps),
+            message = "Unexpected compilation order",
+        )
+    }
+
+    @Test
+    fun `Test modules compilation order case 3`() {
+        val deps = mapOf(
+            "m1" to setOf("m2", "m3", "m4"),
+            "m2" to emptySet(),
+            "m3" to emptySet(),
+            "m4" to setOf("m5", "m6", "m7"),
+            "m5" to setOf("m8"),
+            "m6" to setOf("m8"),
+            "m7" to emptySet(),
+            "m8" to emptySet(),
+            "m9" to emptySet(),
+        )
+        assertEquals(
+            expected = mapOf(
+                0 to setOf("m2", "m3", "m7", "m8", "m9"),
+                1 to setOf("m5", "m6"),
+                2 to setOf("m4"),
+                3 to setOf("m1"),
+            ),
+            actual = resolver.getModuleCompilationOrder(deps),
+            message = "Unexpected compilation order",
+        )
+    }
+
     private fun Map<String, Set<Dependency.Project>>.assertAppModuleChildProjects(vararg names: String) {
         assertEquals(
             expected = names.toSet(),
