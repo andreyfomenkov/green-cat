@@ -265,7 +265,11 @@ class ProjectResolverTest {
             "m3" to emptySet(),
             "m4" to emptySet(),
             "m5" to emptySet(),
-        ).assertAppModuleChildProjects("m1", "m2", "m5")
+        ).assertAppModuleChildProjects(
+            Dependency.Project(moduleName = "m1", relation = Relation.IMPLEMENTATION),
+            Dependency.Project(moduleName = "m2", relation = Relation.IMPLEMENTATION),
+            Dependency.Project(moduleName = "m5", relation = Relation.IMPLEMENTATION),
+        )
     }
 
     @Test
@@ -281,7 +285,9 @@ class ProjectResolverTest {
                 Dependency.Project(moduleName = "m3", relation = Relation.IMPLEMENTATION),
             ),
             "m3" to emptySet(),
-        ).assertAppModuleChildProjects("m1")
+        ).assertAppModuleChildProjects(
+            Dependency.Project(moduleName = "m1", relation = Relation.IMPLEMENTATION),
+        )
     }
 
     @Test
@@ -297,7 +303,10 @@ class ProjectResolverTest {
                 Dependency.Project(moduleName = "m3", relation = Relation.IMPLEMENTATION),
             ),
             "m3" to emptySet(),
-        ).assertAppModuleChildProjects("m1", "m2")
+        ).assertAppModuleChildProjects(
+            Dependency.Project(moduleName = "m1", relation = Relation.IMPLEMENTATION),
+            Dependency.Project(moduleName = "m2", relation = Relation.IMPLEMENTATION),
+        )
     }
 
     @Test
@@ -313,7 +322,11 @@ class ProjectResolverTest {
                 Dependency.Project(moduleName = "m3", relation = Relation.API),
             ),
             "m3" to emptySet(),
-        ).assertAppModuleChildProjects("m1", "m2", "m3")
+        ).assertAppModuleChildProjects(
+            Dependency.Project(moduleName = "m1", relation = Relation.IMPLEMENTATION),
+            Dependency.Project(moduleName = "m2", relation = Relation.IMPLEMENTATION),
+            Dependency.Project(moduleName = "m3", relation = Relation.IMPLEMENTATION),
+        )
     }
 
     @Test
@@ -333,7 +346,152 @@ class ProjectResolverTest {
                 Dependency.Project(moduleName = "m4", relation = Relation.API),
             ),
             "m4" to emptySet(),
-        ).assertAppModuleChildProjects("m1", "m3", "m4")
+        ).assertAppModuleChildProjects(
+            Dependency.Project(moduleName = "m1", relation = Relation.IMPLEMENTATION),
+            Dependency.Project(moduleName = "m3", relation = Relation.IMPLEMENTATION),
+            Dependency.Project(moduleName = "m4", relation = Relation.IMPLEMENTATION),
+        )
+    }
+
+    @Test
+    fun `Test build all module dependencies case 1`() {
+        mapOf(
+            "app" to setOf(
+                Dependency.Project(moduleName = "m1", relation = Relation.IMPLEMENTATION),
+                Dependency.Library(artifact = "com.android:libA", version = "1.0", relation = Relation.IMPLEMENTATION),
+                Dependency.Files(modulePath = "app", filePath = "libA.jar", relation = Relation.IMPLEMENTATION),
+            ),
+            "m1" to setOf(
+                Dependency.Library(artifact = "com.android:libB", version = "2.0", relation = Relation.IMPLEMENTATION),
+                Dependency.Files(modulePath = "m1", filePath = "libB.jar", relation = Relation.IMPLEMENTATION),
+            ),
+        ).assertAppModuleChildProjects(
+            Dependency.Project(moduleName = "m1", relation = Relation.IMPLEMENTATION),
+            Dependency.Library(artifact = "com.android:libA", version = "1.0", relation = Relation.IMPLEMENTATION),
+            Dependency.Files(modulePath = "app", filePath = "libA.jar", relation = Relation.IMPLEMENTATION),
+        )
+    }
+
+    @Test
+    fun `Test build all module dependencies case 2`() {
+        mapOf(
+            "app" to setOf(
+                Dependency.Project(moduleName = "m1", relation = Relation.DEBUG_IMPLEMENTATION),
+                Dependency.Library(artifact = "com.android:libA", version = "1.0", relation = Relation.API),
+                Dependency.Files(modulePath = "app", filePath = "libA.jar", relation = Relation.COMPILE_ONLY),
+            ),
+            "m1" to setOf(
+                Dependency.Library(artifact = "com.android:libB", version = "2.0", relation = Relation.IMPLEMENTATION),
+                Dependency.Files(modulePath = "m1", filePath = "libB.jar", relation = Relation.IMPLEMENTATION),
+            ),
+        ).assertAppModuleChildProjects(
+            Dependency.Project(moduleName = "m1", relation = Relation.IMPLEMENTATION),
+            Dependency.Library(artifact = "com.android:libA", version = "1.0", relation = Relation.IMPLEMENTATION),
+            Dependency.Files(modulePath = "app", filePath = "libA.jar", relation = Relation.IMPLEMENTATION),
+        )
+    }
+
+    @Test
+    fun `Test build all module dependencies case 3`() {
+        mapOf(
+            "app" to setOf(
+                Dependency.Project(moduleName = "m1", relation = Relation.DEBUG_IMPLEMENTATION),
+                Dependency.Library(artifact = "com.android:libA", version = "1.0", relation = Relation.API),
+                Dependency.Files(modulePath = "app", filePath = "libA.jar", relation = Relation.COMPILE_ONLY),
+            ),
+            "m1" to setOf(
+                Dependency.Library(artifact = "com.android:libB", version = "2.0", relation = Relation.API),
+                Dependency.Files(modulePath = "m1", filePath = "libB.jar", relation = Relation.COMPILE_ONLY),
+            ),
+        ).assertAppModuleChildProjects(
+            Dependency.Project(moduleName = "m1", relation = Relation.IMPLEMENTATION),
+            Dependency.Library(artifact = "com.android:libA", version = "1.0", relation = Relation.IMPLEMENTATION),
+            Dependency.Files(modulePath = "app", filePath = "libA.jar", relation = Relation.IMPLEMENTATION),
+            Dependency.Library(artifact = "com.android:libB", version = "2.0", relation = Relation.IMPLEMENTATION),
+            Dependency.Files(modulePath = "m1", filePath = "libB.jar", relation = Relation.IMPLEMENTATION),
+        )
+    }
+
+    @Test
+    fun `Test build all module dependencies case 4`() {
+        mapOf(
+            "app" to setOf(
+                Dependency.Project(moduleName = "m1", relation = Relation.DEBUG_IMPLEMENTATION),
+                Dependency.Library(artifact = "com.android:libA", version = "1.0", relation = Relation.API),
+                Dependency.Files(modulePath = "app", filePath = "libA.jar", relation = Relation.COMPILE_ONLY),
+            ),
+            "m1" to setOf(
+                Dependency.Project(moduleName = "m2", relation = Relation.API),
+            ),
+            "m2" to setOf(
+                Dependency.Project(moduleName = "m3", relation = Relation.API),
+            ),
+            "m3" to setOf(
+                Dependency.Library(artifact = "com.android:libB", version = "2.0", relation = Relation.COMPILE_ONLY),
+                Dependency.Files(modulePath = "m1", filePath = "libB.jar", relation = Relation.API),
+            ),
+        ).assertAppModuleChildProjects(
+            Dependency.Project(moduleName = "m1", relation = Relation.IMPLEMENTATION),
+            Dependency.Project(moduleName = "m2", relation = Relation.IMPLEMENTATION),
+            Dependency.Project(moduleName = "m3", relation = Relation.IMPLEMENTATION),
+            Dependency.Library(artifact = "com.android:libA", version = "1.0", relation = Relation.IMPLEMENTATION),
+            Dependency.Files(modulePath = "app", filePath = "libA.jar", relation = Relation.IMPLEMENTATION),
+            Dependency.Library(artifact = "com.android:libB", version = "2.0", relation = Relation.IMPLEMENTATION),
+            Dependency.Files(modulePath = "m1", filePath = "libB.jar", relation = Relation.IMPLEMENTATION),
+        )
+    }
+
+    @Test
+    fun `Test build all module dependencies case 5`() {
+        mapOf(
+            "app" to setOf(
+                Dependency.Project(moduleName = "m1", relation = Relation.DEBUG_IMPLEMENTATION),
+                Dependency.Library(artifact = "com.android:libA", version = "1.0", relation = Relation.API),
+                Dependency.Files(modulePath = "app", filePath = "libA.jar", relation = Relation.COMPILE_ONLY),
+            ),
+            "m1" to setOf(
+                Dependency.Project(moduleName = "m2", relation = Relation.API),
+            ),
+            "m2" to setOf(
+                Dependency.Project(moduleName = "m3", relation = Relation.IMPLEMENTATION),
+            ),
+            "m3" to setOf(
+                Dependency.Library(artifact = "com.android:libB", version = "2.0", relation = Relation.COMPILE_ONLY),
+                Dependency.Files(modulePath = "m1", filePath = "libB.jar", relation = Relation.API),
+            ),
+        ).assertAppModuleChildProjects(
+            Dependency.Project(moduleName = "m1", relation = Relation.IMPLEMENTATION),
+            Dependency.Project(moduleName = "m2", relation = Relation.IMPLEMENTATION),
+            Dependency.Library(artifact = "com.android:libA", version = "1.0", relation = Relation.IMPLEMENTATION),
+            Dependency.Files(modulePath = "app", filePath = "libA.jar", relation = Relation.IMPLEMENTATION),
+        )
+    }
+
+    @Test
+    fun `Test build all module dependencies case 6`() {
+        mapOf(
+            "app" to setOf(
+                Dependency.Project(moduleName = "m1", relation = Relation.DEBUG_IMPLEMENTATION),
+                Dependency.Library(artifact = "com.android:libA", version = "1.0", relation = Relation.API),
+                Dependency.Files(modulePath = "app", filePath = "libA.jar", relation = Relation.COMPILE_ONLY),
+            ),
+            "m1" to setOf(
+                Dependency.Project(moduleName = "m2", relation = Relation.API),
+            ),
+            "m2" to setOf(
+                Dependency.Project(moduleName = "m3", relation = Relation.API),
+            ),
+            "m3" to setOf(
+                Dependency.Library(artifact = "com.android:libB", version = "2.0", relation = Relation.DEBUG_IMPLEMENTATION),
+                Dependency.Files(modulePath = "m1", filePath = "libB.jar", relation = Relation.IMPLEMENTATION),
+            ),
+        ).assertAppModuleChildProjects(
+            Dependency.Project(moduleName = "m1", relation = Relation.IMPLEMENTATION),
+            Dependency.Project(moduleName = "m2", relation = Relation.IMPLEMENTATION),
+            Dependency.Project(moduleName = "m3", relation = Relation.IMPLEMENTATION),
+            Dependency.Library(artifact = "com.android:libA", version = "1.0", relation = Relation.IMPLEMENTATION),
+            Dependency.Files(modulePath = "app", filePath = "libA.jar", relation = Relation.IMPLEMENTATION),
+        )
     }
 
     @Test
@@ -395,9 +553,9 @@ class ProjectResolverTest {
         )
     }
 
-    private fun Map<String, Set<Dependency.Project>>.assertAppModuleChildProjects(vararg names: String) {
+    private fun Map<String, Set<Dependency>>.assertAppModuleChildProjects(vararg deps: Dependency) {
         assertEquals(
-            expected = names.toSet(),
+            expected = deps.toSet(),
             actual = resolver.getModuleDependencies(
                 modulePath = "app", // Always check for 'app' module
                 modules = this,

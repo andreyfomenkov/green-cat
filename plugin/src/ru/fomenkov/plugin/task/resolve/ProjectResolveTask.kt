@@ -58,7 +58,7 @@ class ProjectResolveTask(
                 moduleNameToPath = moduleNameToPathMap,
             )
             Telemetry.log("# MODULE: ${declaration.path} #")
-            deps.sorted().forEach { path -> Telemetry.log(" - $path") }
+            deps.forEach { path -> Telemetry.log(" - $path") }
             Telemetry.log("")
         }
         //

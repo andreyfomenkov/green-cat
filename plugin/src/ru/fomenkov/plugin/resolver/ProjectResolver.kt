@@ -295,40 +295,50 @@ class ProjectResolver(
     }
 
     /**
-     * Find all child projects including transitive for module
+     * Find all module dependencies including transitive
      *
      * @param modulePath target module path
      * @param modules dependencies for all project modules
      * @param moduleNameToPath map for module path by name
-     * @return a set of all child module paths for the target module
+     * @return a set of all dependencies for the target module, transitive are flattened
      */
     fun getModuleDependencies(
         modulePath: String,
         modules: Map<String, Set<Dependency>>,
         moduleNameToPath: Map<String, String>, // TODO: refactor
-    ): Set<String> {
+    ): Set<Dependency> {
         val getModulePathByName = { name: String ->
             checkNotNull(moduleNameToPath[name]) { "No module path for name: $name" }
         }
         val getProjectDeps = { path: String ->
-            val deps = checkNotNull(modules[path]) { "Module path $path not found" }
-            deps.filterIsInstance<Dependency.Project>()
+            checkNotNull(modules[path]) { "Module path $path not found" }
         }
         val moduleDeps = getProjectDeps(modulePath).toMutableSet()
-        val tempDeps = mutableSetOf<Dependency.Project>()
+        val tempDeps = mutableSetOf<Dependency>()
         val resolvedModulePaths = mutableSetOf<String>()
         var hasUnresolvedProjects = true
 
         while (hasUnresolvedProjects) {
             moduleDeps
-                .filterNot { dep -> isIgnoredModule(moduleName = dep.moduleName) }
+                .filterNot { dep -> dep is Dependency.Project && isIgnoredModule(moduleName = dep.moduleName) }
+                .filterNot { dep -> dep is Dependency.Library && isIgnoredLib(artifact = dep.artifact) }
                 .forEach { dep ->
-                    val path = getModulePathByName(dep.moduleName)
-                    tempDeps += dep.copy(relation = Relation.IMPLEMENTATION)
+                    when (dep) {
+                        is Dependency.Project -> {
+                            val path = getModulePathByName(dep.moduleName)
+                            tempDeps += dep.copy(relation = Relation.IMPLEMENTATION)
 
-                    if (!resolvedModulePaths.contains(path)) {
-                        resolvedModulePaths += path
-                        tempDeps += getProjectDeps(path).filter { project -> project.isTransitive() }
+                            if (!resolvedModulePaths.contains(path)) {
+                                resolvedModulePaths += path
+                                tempDeps += getProjectDeps(path).filter { project -> project.isTransitive() }
+                            }
+                        }
+                        is Dependency.Library -> {
+                            tempDeps += dep.copy(relation = Relation.IMPLEMENTATION) // TODO: refactor
+                        }
+                        is Dependency.Files -> {
+                            tempDeps += dep.copy(relation = Relation.IMPLEMENTATION)
+                        }
                     }
                 }
             moduleDeps.clear()
@@ -336,7 +346,7 @@ class ProjectResolver(
             tempDeps.clear()
             hasUnresolvedProjects = moduleDeps.find { project -> project.isTransitive() } != null
         }
-        return moduleDeps.map { dep -> getModulePathByName(dep.moduleName) }.toSet()
+        return moduleDeps
     }
 
     /**
