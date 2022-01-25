@@ -1,8 +1,6 @@
 package ru.fomenkov.plugin.resolver
 
-import ru.fomenkov.plugin.util.Telemetry
-import ru.fomenkov.plugin.util.exec
-import ru.fomenkov.plugin.util.isVersionGreaterOrEquals
+import ru.fomenkov.plugin.util.*
 import java.io.File
 
 class ProjectResolver(
@@ -144,12 +142,7 @@ class ProjectResolver(
      */
     fun findAllResourcesInGradleCache(path: String): Set<CacheResource> {
         Telemetry.verboseLog("List all JAR / AAR files in Gradle cache")
-
-        val homeDir = exec("echo ~").first() // TODO: refactor
-        if (homeDir.isBlank()) {
-            error("Failed to parse home directory")
-        }
-        val fullPath = path.replace("~", homeDir)
+        val fullPath = path.replace("~", HOME_DIR)
         val resources = mutableSetOf<CacheResource>()
 
         File(fullPath).files { packageDir ->
@@ -226,7 +219,7 @@ class ProjectResolver(
                             else -> properties[placeholderOrVersion]
                         }
                         if (version == null) {
-                            Telemetry.err("[$modulePath] No placeholder version: $placeholderOrVersion for $modulePath")
+                            Telemetry.err("[$modulePath] No placeholder version: $placeholderOrVersion")
                         } else {
                             resolvedLibs += artifact to version
                         }
@@ -302,7 +295,7 @@ class ProjectResolver(
      * @param moduleNameToPath map for module path by name
      * @return a set of all dependencies for the target module, transitive are flattened
      */
-    fun getModuleDependencies(
+    fun getAllModuleDependencies(
         modulePath: String,
         modules: Map<String, Set<Dependency>>,
         moduleNameToPath: Map<String, String>, // TODO: refactor
@@ -386,17 +379,13 @@ class ProjectResolver(
         moduleNameToPathMap: Map<String, String>, // TODO: refactor
     ): Set<String> {
         val classpath = mutableSetOf<String>()
-        val currentDir = exec("pwd").first() // TODO: refactor
-        if (currentDir.isBlank()) {
-            error("Failed to parse current directory")
-        }
         deps.forEach { dep ->
             when (dep) {
                 is Dependency.Project -> {
                     val modulePath = checkNotNull(moduleNameToPathMap[dep.moduleName]) {
                         "No path for module: ${dep.moduleName}"
                     }
-                    "$currentDir/$modulePath".let { dir ->
+                    "$CURRENT_DIR/$modulePath".let { dir ->
                         classpath += "$dir/build/intermediates/javac/debug/classes"
 
                         // TODO: refactor. Find the exact 'compile_*_r_class_jar' directory
@@ -412,10 +401,20 @@ class ProjectResolver(
                     }
                 }
                 is Dependency.Library -> {
-                    classpath += checkNotNull(cachePaths[dep.artifact]) { "No paths for artifact: ${dep.artifact}" }
+                    val paths = cachePaths[dep.artifact]
+
+                    if (paths == null) {
+                        // TODO: looks like firebase-bom has no JAR or AAR resources
+                        // TODO: it specifies version for other Firebase artifacts?
+                        if (!dep.artifact.endsWith("firebase-bom")) {
+                            error("No paths for artifact: ${dep.artifact}")
+                        }
+                    } else {
+                        classpath += paths
+                    }
                 }
                 is Dependency.Files -> {
-                    classpath += "$currentDir/${dep.modulePath}/${dep.filePath}"
+                    classpath += "$CURRENT_DIR/${dep.modulePath}/${dep.filePath}"
                 }
             }
         }
@@ -433,7 +432,6 @@ class ProjectResolver(
                 val platform = platforms.first() // TODO: choose the exact platform
                 classpath += "$androidSdkPath/platforms/$platform/android.jar"
                 classpath += "$androidSdkPath/platforms/$platform/data/res"
-                Telemetry.log("Targeting Android SDK platform: $platform")
             }
         }
         // TODO: need JDK?
@@ -448,7 +446,7 @@ class ProjectResolver(
             .toSet()
     }
 
-    private fun isIgnoredModule(moduleName: String) = ignoredModules.contains(moduleName)
+    fun isIgnoredModule(moduleName: String) = ignoredModules.contains(moduleName)
 
     private fun isIgnoredLib(artifact: String) = ignoredLibs.contains(artifact)
 
@@ -509,9 +507,9 @@ class ProjectResolver(
             line.hasLibraryTestImplementationPrefix() -> Relation.TEST_IMPLEMENTATION
             else -> return null
         }
-        val extractVersion = { line: String ->
-            val lastColonIndex = line.lastIndexOf(":")
-            line.substring(lastColonIndex + 1, line.length).run {
+        val extractVersion = { arg: String ->
+            val lastColonIndex = arg.lastIndexOf(":")
+            arg.substring(lastColonIndex + 1, arg.length).run {
                 split("'")
                     // TODO: refactor
                     .map { part ->
@@ -523,7 +521,7 @@ class ProjectResolver(
                     }
                     .map { part ->
                     part.replace("@aar", "") // TODO: refactor
-                }.find(::isVersionOrPlaceholder) ?: error("[Library dependency] Failed to extract version: $line")
+                }.find(::isVersionOrPlaceholder) ?: error("[Library dependency] Failed to extract version: $arg")
             }
         }
         val artifact: String
@@ -564,6 +562,9 @@ class ProjectResolver(
                         "" // Don't parse compound artifact version, just use the latest one
                     }
                 }
+            } else if (line.count { c -> c == ':' } == 1) {
+                artifact = line.textInQuotes()
+                version = ""
             } else {
                 var cropped = line
 
@@ -580,9 +581,11 @@ class ProjectResolver(
                 version = extractVersion(cropped)
             }
         }
-        checkNotNull(version) { "[Library dependency] Failed to parse parameter 'version' in line: $line" }
-        // TODO: refactor
-        return Dependency.Library(artifact = artifact, version = version!!, relation = relation)
+        return Dependency.Library(
+            artifact = artifact,
+            version = checkNotNull(version) { "[Library dependency] Failed to parse parameter 'version' in line: $line" },
+            relation = relation,
+        )
     }
 
     private fun isVersionOrPlaceholder(part: String): Boolean {

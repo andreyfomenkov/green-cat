@@ -150,6 +150,18 @@ class ProjectResolverTest {
             relation = Relation.ANDROID_TEST_IMPLEMENTATION
         )
             .assertContainsAndDelete(deps)
+        Dependency.Library(
+            artifact = "com.google.firebase:firebase-messaging",
+            version = "",
+            relation = Relation.API
+        )
+            .assertContainsAndDelete(deps)
+        Dependency.Library(
+            artifact = "com.google.firebase:firebase-crashlytics",
+            version = "",
+            relation = Relation.IMPLEMENTATION
+        )
+            .assertContainsAndDelete(deps)
 
         assertTrue(
             deps.isEmpty(),
@@ -612,7 +624,7 @@ class ProjectResolverTest {
     private fun Map<String, Set<Dependency>>.assertAppModuleChildProjects(vararg deps: Dependency) {
         assertEquals(
             expected = deps.toSet(),
-            actual = resolver.getModuleDependencies(
+            actual = resolver.getAllModuleDependencies(
                 modulePath = "app", // Always check for 'app' module
                 modules = this,
                 moduleNameToPath = this.keys.associateBy { it }, // Map module name to path for testing

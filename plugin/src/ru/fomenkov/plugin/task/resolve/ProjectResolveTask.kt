@@ -1,17 +1,17 @@
 package ru.fomenkov.plugin.task.resolve
 
-import ru.fomenkov.plugin.project.Module
 import ru.fomenkov.plugin.resolver.Dependency
 import ru.fomenkov.plugin.resolver.ProjectResolver
 import ru.fomenkov.plugin.task.Task
+import ru.fomenkov.plugin.util.CURRENT_DIR
 import ru.fomenkov.plugin.util.Telemetry
-import ru.fomenkov.plugin.util.exec
+import kotlin.math.abs
 
 class ProjectResolveTask(
-    private val input: GradleProjectInput,
-) : Task<GradleProjectInput, ProjectGraph>(input) {
+    private val input: ProjectResolverInput,
+) : Task<ProjectResolverInput, ProjectResolverOutput>(input) {
 
-    override fun body(): ProjectGraph {
+    override fun body(): ProjectResolverOutput {
         val resolver = ProjectResolver(
             propertiesFileName = input.propertiesFileName,
             settingsFileName = input.settingsFileName,
@@ -29,8 +29,6 @@ class ProjectResolveTask(
         val resolvedLibs = mutableMapOf<String, String>()
         val cachePaths = mutableMapOf<String, Set<String>>()
         val moduleDependencies = mutableMapOf<String, Set<Dependency>>()
-        val moduleChildProjects = mutableMapOf<String, MutableSet<String>>()
-        val moduleParentProjects = mutableMapOf<String, MutableSet<String>>()
 
         moduleDeclarations.forEach { declaration ->
             resolver.apply {
@@ -38,8 +36,6 @@ class ProjectResolveTask(
                 val deps = parseModuleBuildGradleFile(modulePath, properties)
                 moduleDependencies += modulePath to deps
                 resolvedLibs += validateAndResolveLibraryVersions(modulePath, deps, properties, moduleDeclarations)
-                moduleChildProjects += declaration.path to mutableSetOf()
-                moduleParentProjects += declaration.path to mutableSetOf()
                 getArtifactArchivePaths(resolvedLibs, resources, cachePaths)
             }
         }
@@ -47,84 +43,58 @@ class ProjectResolveTask(
         val moduleNameToPathMap = moduleDeclarations.associate { declaration -> // TODO: refactor
             declaration.name to declaration.path
         }
-
-        // TODO: for debugging purposes
-//        moduleDeclarations.forEach { declaration ->
-
-//            Telemetry.log("# MODULE: ${declaration.path} #")
-//            deps.forEach { path -> Telemetry.log(" - $path") }
-//            Telemetry.log("")
-//        }
-        //
-
-
-        val dec = moduleDeclarations.find { dec -> dec.name == "" }
-        checkNotNull(dec) { "Declaration is null" }
-
-        val deps = resolver.getModuleDependencies(
-            modulePath = dec.path,
-            modules = moduleDependencies,
-            moduleNameToPath = moduleNameToPathMap,
-        )
-        Telemetry.log("_______________________ MODULE: ${dec.name} _______________________________")
-        deps
-            .sortedBy { it.javaClass.simpleName }
-            .forEach { dep -> Telemetry.log("[DEP] $dep") }
-
-        val classpath = resolver.buildClasspath(
-            androidSdkPath = "/Users/andrey.fomenkov/Library/Android/sdk",
-            deps = deps,
-            cachePaths = cachePaths,
-            moduleNameToPathMap = moduleNameToPathMap,
-        ).let { paths ->
-            val builder = StringBuilder()
-            paths.forEach { path -> builder.append("$path:") }
-            builder.toString()
+        if (input.sourceFiles.isEmpty()) {
+            error("No source files to compile")
         }
-        Telemetry.log("_______________________ COMPILATION _______________________________")
+        Telemetry.log("\nChanges to be compiled:\n")
+        val sourceFilesClasspath = mutableMapOf<String, Set<String>>()
+        val sourceFilesCompileOrder = mutableMapOf<String, Int>()
 
-        Telemetry.log("_______________________ CLASSPATH _______________________________")
-        Telemetry.log(classpath.replace(":", "\n"))
+        input.sourceFiles.forEach { absoluteSrcPath ->
+            val relativeSrcPath = absoluteSrcPath.substring(CURRENT_DIR.length + 1, absoluteSrcPath.length)
+            val index = relativeSrcPath.indexOf("/src")
 
-//        moduleDependencies.forEach { (modulePath, deps) ->
-//            val childProjects = checkNotNull(moduleChildProjects[modulePath]) {
-//                "No key for module path $modulePath found in child projects"
-//            }
-//            deps.forEach { dependency ->
-//                if (dependency is Dependency.Project && !resolver.isIgnoredModule(dependency.moduleName)) {
-//                    // TODO: refactor
-//                    val child = checkNotNull(moduleNameToPathMap[dependency.moduleName]) {
-//                        "No module path for name: ${dependency.moduleName}"
-//                    }
-//                    childProjects += child
-//
-//                    val parentProjects = checkNotNull(moduleParentProjects[child]) {
-//                        "No key for module path $child found in parent projects"
-//                    }
-//                    parentProjects += modulePath
-//                    moduleParentProjects[child] = parentProjects
-//                }
-//            }
-//            moduleChildProjects[modulePath] = childProjects
+            if (index == -1) {
+                error("Failed to parse module path")
+            }
+            val modulePath = relativeSrcPath.substring(0, index)
+            val supportMessage = when (isFileSupported(absoluteSrcPath)) {
+                true -> "(OK)"
+                else -> "(NOT SUPPORTED)"
+            }
+            check(moduleDependencies.containsKey(modulePath)) { "No module found with path: $modulePath" }
+            Telemetry.log(" - [$modulePath] $relativeSrcPath $supportMessage")
+
+            val deps = resolver.getAllModuleDependencies(
+                modulePath = modulePath,
+                modules = moduleDependencies,
+                moduleNameToPath = moduleNameToPathMap,
+            )
+            val classpath = resolver.buildClasspath(
+                androidSdkPath = input.androidSdkPath,
+                deps = deps,
+                cachePaths = cachePaths,
+                moduleNameToPathMap = moduleNameToPathMap,
+            )
+            sourceFilesClasspath += absoluteSrcPath to classpath
+            sourceFilesCompileOrder += absoluteSrcPath to 0 // TODO: implement
+        }
+        Telemetry.log("")
+
+        // TODO: hack => get all project classpath
+//        val deps = mutableSetOf<Dependency>()
+//        moduleDependencies.values.forEach { ////////
+//            deps += it
+//                .filterNot { it is Dependency.Project && resolver.isIgnoredModule(it.moduleName) }
+//                .filterNot { it is Dependency.Library && it.relation == Relation.ANDROID_TEST_IMPLEMENTATION }
+//                .filterNot { it is Dependency.Library && it.relation == Relation.TEST_IMPLEMENTATION }
 //        }
-//        Telemetry.log("Building project dependency graph")
-        val graph = mutableSetOf<Module>()
-//
-//        moduleDeclarations.forEach { declaration ->
-//            val modulePath = declaration.path
-//
-//            graph += Module(
-//                name = declaration.name,
-//                path = modulePath,
-//                children = mutableSetOf(),
-//                parents = mutableSetOf(),
-//                libraries = mutableSetOf(),
-//            )
-//        }
-        return ProjectGraph(graph)
+        return ProjectResolverOutput(sourceFilesClasspath, sourceFilesCompileOrder)
     }
 
+    private fun isFileSupported(path: String) = path.trim().endsWith(".java")
+
     private companion object {
-        const val GRADLE_CACHE_PATH = "~/.gradle/caches/modules-2/files-2.1"
+        const val GRADLE_CACHE_PATH = "~/.gradle/caches/modules-2/files-2.1" // TODO: suffixes can be different
     }
 }
