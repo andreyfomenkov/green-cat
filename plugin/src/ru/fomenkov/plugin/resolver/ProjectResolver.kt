@@ -145,7 +145,7 @@ class ProjectResolver(
     fun findAllResourcesInGradleCache(path: String): Set<CacheResource> {
         Telemetry.verboseLog("List all JAR / AAR files in Gradle cache")
 
-        val homeDir = exec("echo ~").first()
+        val homeDir = exec("echo ~").first() // TODO: refactor
         if (homeDir.isBlank()) {
             error("Failed to parse home directory")
         }
@@ -371,6 +371,81 @@ class ProjectResolver(
             order++
         }
         return pathOrders
+    }
+
+    /**
+     * Build classpath for the specified dependencies
+     *
+     * @param deps dependencies to build classpath for
+     * @param cachePaths artifacts mapped to their resource paths in Gradle cache
+     */
+    fun buildClasspath(
+        androidSdkPath: String,
+        deps: Set<Dependency>,
+        cachePaths: MutableMap<String, Set<String>>,
+        moduleNameToPathMap: Map<String, String>, // TODO: refactor
+    ): Set<String> {
+        val classpath = mutableSetOf<String>()
+        val currentDir = exec("pwd").first() // TODO: refactor
+        if (currentDir.isBlank()) {
+            error("Failed to parse current directory")
+        }
+        deps.forEach { dep ->
+            when (dep) {
+                is Dependency.Project -> {
+                    val modulePath = checkNotNull(moduleNameToPathMap[dep.moduleName]) {
+                        "No path for module: ${dep.moduleName}"
+                    }
+                    "$currentDir/$modulePath".let { dir ->
+                        classpath += "$dir/build/intermediates/javac/debug/classes"
+
+                        // TODO: refactor. Find the exact 'compile_*_r_class_jar' directory
+                        classpath += "$dir/build/intermediates/compile_r_class_jar/debug/R.jar"
+                        classpath += "$dir/build/intermediates/compile_and_runtime_not_namespaced_r_class_jar/debug/R.jar"
+
+                        classpath += "$dir/build/tmp/kotlin-classes/debug"
+                        classpath += "$dir/build/tmp/kapt3/classes/debug"
+                        classpath += "$dir/build/generated/res/resValues/debug"
+                        classpath += "$dir/build/generated/res/rs/debug"
+                        classpath += "$dir/build/generated/crashlytics/res/debug"
+                        classpath += "$dir/build/generated/res/google-services/debug"
+                    }
+                }
+                is Dependency.Library -> {
+                    classpath += checkNotNull(cachePaths[dep.artifact]) { "No paths for artifact: ${dep.artifact}" }
+                }
+                is Dependency.Files -> {
+                    classpath += "$currentDir/${dep.modulePath}/${dep.filePath}"
+                }
+            }
+        }
+        if (!File(androidSdkPath).exists()) {
+            error("Invalid Android SDK path: $androidSdkPath")
+        }
+        val platforms = File("$androidSdkPath/platforms").list()?.filter { path ->
+            path.startsWith("android-")
+        }
+        when {
+            platforms.isNullOrEmpty() -> {
+                error("No platforms installed for Android SDK: ${androidSdkPath}/platform")
+            }
+            else -> {
+                val platform = platforms.first() // TODO: choose the exact platform
+                classpath += "$androidSdkPath/platforms/$platform/android.jar"
+                classpath += "$androidSdkPath/platforms/$platform/data/res"
+                Telemetry.log("Targeting Android SDK platform: $platform")
+            }
+        }
+        // TODO: need JDK?
+        return classpath
+            .filter { path ->
+                File(path).exists().also { exists ->
+                    if (!exists) {
+                        Telemetry.verboseErr("[Classpath] Path doesn't exist: $path")
+                    }
+                }
+            }
+            .toSet()
     }
 
     private fun isIgnoredModule(moduleName: String) = ignoredModules.contains(moduleName)

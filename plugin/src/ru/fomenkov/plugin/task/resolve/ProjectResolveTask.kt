@@ -2,12 +2,10 @@ package ru.fomenkov.plugin.task.resolve
 
 import ru.fomenkov.plugin.project.Module
 import ru.fomenkov.plugin.resolver.Dependency
-import ru.fomenkov.plugin.resolver.ModuleDeclaration
 import ru.fomenkov.plugin.resolver.ProjectResolver
 import ru.fomenkov.plugin.task.Task
 import ru.fomenkov.plugin.util.Telemetry
-import ru.fomenkov.plugin.util.formatMillis
-import java.io.File
+import ru.fomenkov.plugin.util.exec
 
 class ProjectResolveTask(
     private val input: GradleProjectInput,
@@ -51,17 +49,42 @@ class ProjectResolveTask(
         }
 
         // TODO: for debugging purposes
-        moduleDeclarations.forEach { declaration ->
-            val deps = resolver.getModuleDependencies(
-                modulePath = declaration.path,
-                modules = moduleDependencies,
-                moduleNameToPath = moduleNameToPathMap,
-            )
-            Telemetry.log("# MODULE: ${declaration.path} #")
-            deps.forEach { path -> Telemetry.log(" - $path") }
-            Telemetry.log("")
-        }
+//        moduleDeclarations.forEach { declaration ->
+
+//            Telemetry.log("# MODULE: ${declaration.path} #")
+//            deps.forEach { path -> Telemetry.log(" - $path") }
+//            Telemetry.log("")
+//        }
         //
+
+
+        val dec = moduleDeclarations.find { dec -> dec.name == "" }
+        checkNotNull(dec) { "Declaration is null" }
+
+        val deps = resolver.getModuleDependencies(
+            modulePath = dec.path,
+            modules = moduleDependencies,
+            moduleNameToPath = moduleNameToPathMap,
+        )
+        Telemetry.log("_______________________ MODULE: ${dec.name} _______________________________")
+        deps
+            .sortedBy { it.javaClass.simpleName }
+            .forEach { dep -> Telemetry.log("[DEP] $dep") }
+
+        val classpath = resolver.buildClasspath(
+            androidSdkPath = "/Users/andrey.fomenkov/Library/Android/sdk",
+            deps = deps,
+            cachePaths = cachePaths,
+            moduleNameToPathMap = moduleNameToPathMap,
+        ).let { paths ->
+            val builder = StringBuilder()
+            paths.forEach { path -> builder.append("$path:") }
+            builder.toString()
+        }
+        Telemetry.log("_______________________ COMPILATION _______________________________")
+
+        Telemetry.log("_______________________ CLASSPATH _______________________________")
+        Telemetry.log(classpath.replace(":", "\n"))
 
 //        moduleDependencies.forEach { (modulePath, deps) ->
 //            val childProjects = checkNotNull(moduleChildProjects[modulePath]) {

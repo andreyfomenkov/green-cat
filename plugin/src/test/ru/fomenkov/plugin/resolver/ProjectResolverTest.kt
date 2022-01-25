@@ -47,7 +47,8 @@ class ProjectResolverTest {
     fun `Test parse build Gradle file for dependencies`() {
         // See ./plugin/src/res/test-project/module-1/build.gradle
         val properties = mutableMapOf<String, String>() // Not required for this test
-        val deps = resolver.parseModuleBuildGradleFile(modulePath = fromResources("test-project/module-1"), properties).toMutableSet()
+        val deps = resolver.parseModuleBuildGradleFile(modulePath = fromResources("test-project/module-1"), properties)
+            .toMutableSet()
 
         // Files
         Dependency.Files(
@@ -83,34 +84,77 @@ class ProjectResolverTest {
         // Libs
         Dependency.Library(artifact = "com.google.guava:guava", version = "19.0", relation = Relation.API)
             .assertContainsAndDelete(deps)
-        Dependency.Library(artifact = "com.google.android.gms:play-services-cast", version = "16.0.3", relation = Relation.API)
+        Dependency.Library(
+            artifact = "com.google.android.gms:play-services-cast",
+            version = "16.0.3",
+            relation = Relation.API
+        )
             .assertContainsAndDelete(deps)
         Dependency.Library(artifact = "org.jmdns:jmdns", version = "3.5.1", relation = Relation.IMPLEMENTATION)
             .assertContainsAndDelete(deps)
-        Dependency.Library(artifact = "ru.ok.android-android2:duration-interval", version = "library_b.version", relation = Relation.IMPLEMENTATION)
+        Dependency.Library(
+            artifact = "ru.ok.android-android2:duration-interval",
+            version = "library_b.version",
+            relation = Relation.IMPLEMENTATION
+        )
             .assertContainsAndDelete(deps)
-        Dependency.Library(artifact = "com.facebook.device.yearclass:yearclass", version = "library_a.version", relation = Relation.API)
+        Dependency.Library(
+            artifact = "com.facebook.device.yearclass:yearclass",
+            version = "library_a.version",
+            relation = Relation.API
+        )
             .assertContainsAndDelete(deps)
-        Dependency.Library(artifact = "com.google.android:library", version = "library_c.version", relation = Relation.IMPLEMENTATION)
+        Dependency.Library(
+            artifact = "com.google.android:library",
+            version = "library_c.version",
+            relation = Relation.IMPLEMENTATION
+        )
             .assertContainsAndDelete(deps)
-        Dependency.Library(artifact = "me.leolin:ShortcutBadger", version = "1.1.22", relation = Relation.IMPLEMENTATION)
+        Dependency.Library(
+            artifact = "me.leolin:ShortcutBadger",
+            version = "1.1.22",
+            relation = Relation.IMPLEMENTATION
+        )
             .assertContainsAndDelete(deps)
         Dependency.Library(artifact = "com.android:library-controls", version = "", relation = Relation.IMPLEMENTATION)
             .assertContainsAndDelete(deps)
-        Dependency.Library(artifact = "com.google.guava:guava", version = "project.ext.guavaVersion", relation = Relation.TEST_IMPLEMENTATION)
+        Dependency.Library(
+            artifact = "com.google.guava:guava",
+            version = "project.ext.guavaVersion",
+            relation = Relation.TEST_IMPLEMENTATION
+        )
             .assertContainsAndDelete(deps)
         Dependency.Library(artifact = "junit:junit", version = "junit.version", relation = Relation.TEST_IMPLEMENTATION)
             .assertContainsAndDelete(deps)
-        Dependency.Library(artifact = "org.robolectric:robolectric", version = "robolectric.version", relation = Relation.ANDROID_TEST_IMPLEMENTATION)
+        Dependency.Library(
+            artifact = "org.robolectric:robolectric",
+            version = "robolectric.version",
+            relation = Relation.ANDROID_TEST_IMPLEMENTATION
+        )
             .assertContainsAndDelete(deps)
-        Dependency.Library(artifact = "org.apache.commons:commons-lang3", version = "3.4", relation = Relation.ANDROID_TEST_IMPLEMENTATION)
+        Dependency.Library(
+            artifact = "org.apache.commons:commons-lang3",
+            version = "3.4",
+            relation = Relation.ANDROID_TEST_IMPLEMENTATION
+        )
             .assertContainsAndDelete(deps)
-        Dependency.Library(artifact = "com.android:common-api", version = "2.1.456-SNAPSHOT", relation = Relation.ANDROID_TEST_IMPLEMENTATION)
+        Dependency.Library(
+            artifact = "com.android:common-api",
+            version = "2.1.456-SNAPSHOT",
+            relation = Relation.ANDROID_TEST_IMPLEMENTATION
+        )
             .assertContainsAndDelete(deps)
-        Dependency.Library(artifact = "com.android:test-library", version = "1.6.65", relation = Relation.ANDROID_TEST_IMPLEMENTATION)
+        Dependency.Library(
+            artifact = "com.android:test-library",
+            version = "1.6.65",
+            relation = Relation.ANDROID_TEST_IMPLEMENTATION
+        )
             .assertContainsAndDelete(deps)
 
-        assertTrue(deps.isEmpty(), "Collection is not empty. The following item(s) are left:\n${formatDepsListMessage(deps)}")
+        assertTrue(
+            deps.isEmpty(),
+            "Collection is not empty. The following item(s) are left:\n${formatDepsListMessage(deps)}"
+        )
     }
 
     @Test
@@ -118,7 +162,11 @@ class ProjectResolverTest {
         val versions = resolver.validateAndResolveLibraryVersions(
             modulePath = fromResources("test-project/module-1"),
             deps = setOf(
-                Dependency.Library(artifact = "com.library_a", version = "lib_a.version", relation = Relation.DEBUG_IMPLEMENTATION),
+                Dependency.Library(
+                    artifact = "com.library_a",
+                    version = "lib_a.version",
+                    relation = Relation.DEBUG_IMPLEMENTATION
+                ),
                 Dependency.Project(moduleName = "module-2", relation = Relation.DEBUG_IMPLEMENTATION),
                 Dependency.Library(artifact = "com.library_b", version = "0.1.2", relation = Relation.IMPLEMENTATION),
                 Dependency.Project(moduleName = "module-3", relation = Relation.IMPLEMENTATION),
@@ -239,7 +287,11 @@ class ProjectResolverTest {
             )
         }
         // 8.9.4 not found in Gradle cache -> choose the closest one: 8.12.30
-        assertArtifactArchivePaths(artifact = "com.googlecode.libphonenumber:libphonenumber", version = "8.9.4", allPaths) {
+        assertArtifactArchivePaths(
+            artifact = "com.googlecode.libphonenumber:libphonenumber",
+            version = "8.9.4",
+            allPaths
+        ) {
             setOf(
                 "/Users/andrey/.gradle/caches/modules-2/files-2.1/com.googlecode.libphonenumber/libphonenumber/8.12.30/54fa9f1ab2e8c8ce1417424fc4ed95ff7c9ebfb/libphonenumber-8.12.30.jar",
                 "/Users/andrey/.gradle/caches/modules-2/files-2.1/com.googlecode.libphonenumber/libphonenumber/8.12.30/58c7b42d217f06712837c34972a8a78e6968ce6b/libphonenumber-8.12.30-sources.jar",
@@ -482,7 +534,11 @@ class ProjectResolverTest {
                 Dependency.Project(moduleName = "m3", relation = Relation.API),
             ),
             "m3" to setOf(
-                Dependency.Library(artifact = "com.android:libB", version = "2.0", relation = Relation.DEBUG_IMPLEMENTATION),
+                Dependency.Library(
+                    artifact = "com.android:libB",
+                    version = "2.0",
+                    relation = Relation.DEBUG_IMPLEMENTATION
+                ),
                 Dependency.Files(modulePath = "m1", filePath = "libB.jar", relation = Relation.IMPLEMENTATION),
             ),
         ).assertAppModuleChildProjects(
@@ -565,7 +621,12 @@ class ProjectResolverTest {
         )
     }
 
-    private fun assertArtifactArchivePaths(artifact: String, version: String, allPaths: Set<CacheResource>, expectedPaths: () -> Set<String>) {
+    private fun assertArtifactArchivePaths(
+        artifact: String,
+        version: String,
+        allPaths: Set<CacheResource>,
+        expectedPaths: () -> Set<String>
+    ) {
         val cachePaths = mutableMapOf<String, Set<String>>()
         resolver.getArtifactArchivePaths(
             resolvedLibs = mapOf(artifact to version),
@@ -583,7 +644,11 @@ class ProjectResolverTest {
     }.toString()
 
     private fun Dependency.assertContainsAndDelete(deps: MutableSet<Dependency>) {
-        assertContains(deps, this, "Dependency not found:\n - $this\nDependencies left:\n${formatDepsListMessage(deps)}\n")
+        assertContains(
+            deps,
+            this,
+            "Dependency not found:\n - $this\nDependencies left:\n${formatDepsListMessage(deps)}\n"
+        )
         deps -= this
     }
 }
