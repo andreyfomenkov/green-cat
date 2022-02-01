@@ -4,7 +4,5 @@ data class ProjectResolverInput(
     val propertiesFileName: String,  // Project's gradle.properties (version placeholders)
     val settingsFileName: String,    // Project's settings.gradle (all modules)
     val sourceFiles: Set<String>,    // Sources to compile (.java or .kt files)
-    val ignoredModules: Set<String>,
-    val ignoredLibs: Set<String>,
     val androidSdkPath: String,
 )

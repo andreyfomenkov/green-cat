@@ -2,6 +2,7 @@ package ru.fomenkov.plugin.resolver
 
 import ru.fomenkov.plugin.util.*
 import java.io.File
+import java.io.FileFilter
 
 class ProjectResolver(
     private val propertiesFileName: String,
@@ -138,26 +139,33 @@ class ProjectResolver(
 
     /**
      * @param path Gradle cache root path
-     * @return all JAR and AAR resources
+     * @return all cache resources (JAR, AAR archives and POM files)
      */
-    fun findAllResourcesInGradleCache(path: String): Set<CacheResource> {
-        Telemetry.verboseLog("List all JAR / AAR files in Gradle cache")
+    fun findAllResourcesInGradleCache(path: String): Set<GradleCacheItem> {
+        Telemetry.verboseLog("List all JAR, AAR and POM files in Gradle cache")
         val fullPath = path.replace("~", HOME_DIR)
-        val resources = mutableSetOf<CacheResource>()
+        val items = mutableSetOf<GradleCacheItem>()
 
         File(fullPath).files { packageDir ->
             packageDir.files { artifactDir ->
                 artifactDir.files { versionDir ->
                     versionDir.files { hashDir ->
                         hashDir.files { resourceFile ->
-                            // TODO: filter -sources.* and -javadoc.*
+                            // TODO: filter -sources.* and -javadoc.*?
                             if (resourceFile.extension == "jar" || resourceFile.extension == "aar") {
-                                resources += CacheResource(
+                                items += GradleCacheItem.Archive(
                                     pkg = packageDir.name,
                                     artifact = artifactDir.name,
                                     version = versionDir.name,
                                     resource = resourceFile.name,
                                     fullPath = resourceFile.path,
+                                )
+                            } else if (resourceFile.extension == "pom") {
+                                items += parsePomFile(
+                                    pkg = packageDir.name,
+                                    artifact = artifactDir.name,
+                                    version = versionDir.name,
+                                    pomFile = resourceFile,
                                 )
                             }
                         }
@@ -165,10 +173,115 @@ class ProjectResolver(
                 }
             }
         }
-        return resources
+        return items
     }
 
-    private fun File.files(action: (File) -> Unit) = checkNotNull(listFiles()) {
+    /**
+     * @param path Gradle cache root path
+     * @return jetified artifact names + version mapped to their paths in cache (classes.jar and /res if any)
+     */
+    fun findAllJetifiedJarsInGradleCache(path: String): Map<String, Set<String>> {
+        Telemetry.verboseLog("List all jetified JARs")
+        val fullPath = path.replace("~", HOME_DIR)
+        val paths = mutableMapOf<String, Set<String>>()
+        val directoryFilter = FileFilter { it.isDirectory }
+
+        File(fullPath).files { hashDir ->
+            if (hashDir.isDirectory) {
+                hashDir.files(filter = directoryFilter) { innerDir ->
+                    if (innerDir.name == "transformed") {
+                        innerDir.files(filter = directoryFilter) { file ->
+                            val classesJarPath = "${file.absolutePath}/jars/classes.jar"
+                            val resDirPath = "${file.absolutePath}/res"
+                            val resources = mutableSetOf<String>()
+
+                            if (File(classesJarPath).exists()) {
+                                resources += classesJarPath
+                            }
+                            if (File(resDirPath).exists()) {
+                                resources += resDirPath
+                            }
+                            if (resources.isNotEmpty()) {
+                                val name = file.name.replace("jetified-", "").trim()
+                                paths[name] = resources
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return paths
+    }
+
+    private fun parsePomFile(pkg: String, artifact: String, version: String, pomFile: File): GradleCacheItem.Pom {
+        val lines = pomFile.readLines()
+        val deps = mutableSetOf<PomDependency>()
+        var insideBlock = false
+        var depGroupId: String? = null
+        var depArtifactId: String? = null
+        var depVersion = "" // Default value
+        var scope = PomDependencyScope.COMPILE // Default value
+
+        if (lines.isEmpty()) {
+            error("POM file is empty: ${pomFile.absolutePath}")
+        }
+        val getParameterValue = { line: String ->
+            val start = line.indexOf(">")
+            val end = line.indexOf("</")
+
+            if (start == -1 || end == -1) { // TODO: refactor
+                error("Failed to parse parameter: $line")
+            }
+            line.substring(start + 1, end)
+        }
+        lines
+            .map { line -> line.trim() }
+            .forEach { line ->
+                when {
+                    line.startsWith("<dependency>") -> {
+                        if (insideBlock) {
+                            error("Unexpected line: $line")
+                        }
+                        insideBlock = true
+                    }
+                    line.startsWith("</dependency>") -> {
+                        if (!insideBlock) {
+                            error("Unexpected line: $line")
+                        }
+                        deps += PomDependency(
+                            groupId = checkNotNull(depGroupId) { "No parameter groupId: ${pomFile.absolutePath}" },
+                            artifactId = checkNotNull(depArtifactId) { "No parameter artifactId: ${pomFile.absolutePath}" },
+                            version = depVersion,
+                            scope = scope,
+                        )
+                        insideBlock = false
+                        depGroupId = null
+                        depArtifactId = null
+                        depVersion = "" // Default value
+                        scope = PomDependencyScope.COMPILE // Default value
+                    }
+                    insideBlock && line.startsWith("<groupId>") -> {
+                        depGroupId = getParameterValue(line)
+                    }
+                    insideBlock && line.startsWith("<artifactId>") -> {
+                        depArtifactId = getParameterValue(line)
+                    }
+                    insideBlock && line.startsWith("<version>") -> {
+                        depVersion = getParameterValue(line)
+                    }
+                    insideBlock && line.startsWith("<scope>") -> {
+                        val value = getParameterValue(line).trim().uppercase()
+                        scope = PomDependencyScope.valueOf(value)
+                    }
+                    insideBlock -> {
+                        Telemetry.verboseErr("[POM] Unrecognized parameter: $line")
+                    }
+                }
+            }
+        return GradleCacheItem.Pom(pkg = pkg, artifact = artifact, version = version, dependencies = deps)
+    }
+
+    private fun File.files(filter: FileFilter? = null, action: (File) -> Unit) = checkNotNull(listFiles(filter)) {
         "Failed to list files for directory: $path"
     }.forEach(action)
 
@@ -233,28 +346,29 @@ class ProjectResolver(
 
     /**
      * @param resolvedLibs map of artifact to resolved versions
-     * @param cacheResources all JAR / AAR resources in Gradle cache
-     * @param cachePaths output map for artifacts to their archive paths in Gradle cache
+     * @param cacheItems all JAR, AAR or POM resources in Gradle cache
+     * @param cachePaths output map for artifacts to their archive paths in Gradle cache, including transitive
      */
     fun getArtifactArchivePaths(
         resolvedLibs: Map<String, String>,
-        cacheResources: Set<CacheResource>,
+        cacheItems: Set<GradleCacheItem>,
         cachePaths: MutableMap<String, Set<String>>,
     ) {
         // Artifact mapped to existing versions. In turn each version maps to the actual JAR / AAR paths
         val artifacts = mutableMapOf<String, MutableMap<String, MutableSet<String>>>() // TODO: refactor
-        val fullPaths = mutableSetOf<String>()
 
-        cacheResources.forEach { res ->
-            val fullArtifactId = "${res.pkg}:${res.artifact}"
-            val versions = artifacts[fullArtifactId] ?: mutableMapOf()
-            val paths = versions[res.version] ?: mutableSetOf()
+        cacheItems
+            .asSequence()
+            .filterIsInstance<GradleCacheItem.Archive>()
+            .forEach { archive ->
+                val fullArtifactId = "${archive.pkg}:${archive.artifact}"
+                val versions = artifacts[fullArtifactId] ?: mutableMapOf()
+                val paths = versions[archive.version] ?: mutableSetOf()
 
-            paths += res.fullPath
-            versions[res.version] = paths
-            artifacts[fullArtifactId] = versions
-            fullPaths += res.fullPath
-        }
+                paths += archive.fullPath
+                versions[archive.version] = paths
+                artifacts[fullArtifactId] = versions
+            }
         resolvedLibs.forEach { (artifact, version) ->
             if (!cachePaths.containsKey(artifact)) {
                 val versions = artifacts[artifact]
@@ -282,6 +396,21 @@ class ProjectResolver(
                     } else {
                         cachePaths += artifact to paths
                     }
+                }
+            }
+        }
+        resolvedLibs.forEach { (artifact, version) -> // TODO: optimize
+            val pom = cacheItems.asSequence()
+                .filterIsInstance<GradleCacheItem.Pom>()
+                .find { item -> "${item.pkg}:${item.artifact}" == artifact && item.version == version } // TODO: refactor
+
+            pom?.dependencies?.forEach { dep ->
+                val versions = artifacts[dep.groupId + ":" + dep.artifactId]
+
+                if (versions != null) {
+                    val transitive = versions[dep.version] ?: mutableSetOf()
+                    val existing = cachePaths[artifact] ?: emptySet() // TODO: refactor
+                    cachePaths[artifact] = existing + transitive
                 }
             }
         }

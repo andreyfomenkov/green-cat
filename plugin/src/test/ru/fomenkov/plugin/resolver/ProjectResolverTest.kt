@@ -242,7 +242,7 @@ class ProjectResolverTest {
                 }
                 val parts = line.substring(startIndex, line.length).split("/")
 
-                CacheResource(
+                GradleCacheItem.Archive(
                     pkg = parts[0],
                     artifact = parts[1],
                     version = parts[2],
@@ -636,13 +636,13 @@ class ProjectResolverTest {
     private fun assertArtifactArchivePaths(
         artifact: String,
         version: String,
-        allPaths: Set<CacheResource>,
+        allPaths: Set<GradleCacheItem>,
         expectedPaths: () -> Set<String>
     ) {
         val cachePaths = mutableMapOf<String, Set<String>>()
         resolver.getArtifactArchivePaths(
             resolvedLibs = mapOf(artifact to version),
-            cacheResources = allPaths,
+            cacheItems = allPaths,
             cachePaths = cachePaths,
         )
         assertEquals(expectedPaths(), cachePaths[artifact])

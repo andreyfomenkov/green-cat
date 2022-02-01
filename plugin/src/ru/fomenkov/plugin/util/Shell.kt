@@ -1,6 +1,6 @@
 package ru.fomenkov.plugin.util
 
-private const val SHELL = "/bin/zsh"
+private const val SHELL = "/bin/sh" // Keep sh for mainframer
 
 fun exec(cmd: String): List<String> {
     try {

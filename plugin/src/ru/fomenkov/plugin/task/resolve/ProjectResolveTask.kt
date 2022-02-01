@@ -1,11 +1,12 @@
 package ru.fomenkov.plugin.task.resolve
 
-import ru.fomenkov.plugin.resolver.Dependency
+import ru.fomenkov.plugin.resolver.GradleCacheItem
 import ru.fomenkov.plugin.resolver.ProjectResolver
 import ru.fomenkov.plugin.task.Task
 import ru.fomenkov.plugin.util.CURRENT_DIR
 import ru.fomenkov.plugin.util.Telemetry
-import kotlin.math.abs
+import ru.fomenkov.plugin.util.noTilda
+import java.io.File
 
 class ProjectResolveTask(
     private val input: ProjectResolverInput,
@@ -15,86 +16,205 @@ class ProjectResolveTask(
         val resolver = ProjectResolver(
             propertiesFileName = input.propertiesFileName,
             settingsFileName = input.settingsFileName,
-            ignoredModules = input.ignoredModules,
-            ignoredLibs = input.ignoredLibs,
         )
-        val properties = resolver.parseGradleProperties().toMutableMap() // TODO: refactor
         val moduleDeclarations = resolver.parseModuleDeclarations()
+
         Telemetry.log("Project has ${moduleDeclarations.size} module(s)")
+        Telemetry.log("Resolving project dependencies...")
 
-        val resources = resolver.findAllResourcesInGradleCache(GRADLE_CACHE_PATH)
-        Telemetry.verboseLog("Total ${resources.size} resources in Gradle cache")
+        // TODO: optimize
+        val fileCacheResources = resolver.findAllResourcesInGradleCache(GRADLE_RESOURCES_CACHE_PATH)
+        val jetifiedResources = resolver.findAllJetifiedJarsInGradleCache(JETIFIED_RESOURCES_CACHE_PATH)
+        val moduleNameToPathMap = moduleDeclarations.associate { it.name to it.path } // TODO: refactor
 
-        Telemetry.log("Resolving library versions and JAR/AAR artifacts in Gradle cache")
-        val resolvedLibs = mutableMapOf<String, String>()
-        val cachePaths = mutableMapOf<String, Set<String>>()
-        val moduleDependencies = mutableMapOf<String, Set<Dependency>>()
-
-        moduleDeclarations.forEach { declaration ->
-            resolver.apply {
-                val modulePath = declaration.path
-                val deps = parseModuleBuildGradleFile(modulePath, properties)
-                moduleDependencies += modulePath to deps
-                resolvedLibs += validateAndResolveLibraryVersions(modulePath, deps, properties, moduleDeclarations)
-                getArtifactArchivePaths(resolvedLibs, resources, cachePaths)
-            }
-        }
-        Telemetry.log("Resolving project dependencies")
-        val moduleNameToPathMap = moduleDeclarations.associate { declaration -> // TODO: refactor
-            declaration.name to declaration.path
-        }
-        if (input.sourceFiles.isEmpty()) {
-            error("No source files to compile")
-        }
-        Telemetry.log("\nChanges to be compiled:\n")
+        // TODO: fill in sourceFilesClasspath and sourceFilesCompileOrder
         val sourceFilesClasspath = mutableMapOf<String, Set<String>>()
         val sourceFilesCompileOrder = mutableMapOf<String, Int>()
 
-        input.sourceFiles.forEach { absoluteSrcPath ->
-            val relativeSrcPath = absoluteSrcPath.substring(CURRENT_DIR.length + 1, absoluteSrcPath.length)
-            val index = relativeSrcPath.indexOf("/src")
-
-            if (index == -1) {
-                error("Failed to parse module path")
-            }
-            val modulePath = relativeSrcPath.substring(0, index)
-            val supportMessage = when (isFileSupported(absoluteSrcPath)) {
-                true -> "(OK)"
-                else -> "(NOT SUPPORTED)"
-            }
-            check(moduleDependencies.containsKey(modulePath)) { "No module found with path: $modulePath" }
-            Telemetry.log(" - [$modulePath] $relativeSrcPath $supportMessage")
-
-            val deps = resolver.getAllModuleDependencies(
-                modulePath = modulePath,
-                modules = moduleDependencies,
-                moduleNameToPath = moduleNameToPathMap,
-            )
-            val classpath = resolver.buildClasspath(
+        input.sourceFiles.forEach { sourceFile ->
+            val classpath = buildClasspathForSourceFile(
+                sourceFilePath = sourceFile,
                 androidSdkPath = input.androidSdkPath,
-                deps = deps,
-                cachePaths = cachePaths,
                 moduleNameToPathMap = moduleNameToPathMap,
+                fileCacheResources = fileCacheResources,
+                jetifiedResources = jetifiedResources,
             )
-            sourceFilesClasspath += absoluteSrcPath to classpath
-            sourceFilesCompileOrder += absoluteSrcPath to 0 // TODO: implement
+            sourceFilesClasspath += sourceFile to classpath
         }
-        Telemetry.log("")
+        // TODO: determine compilation order
+        input.sourceFiles.forEach { path -> sourceFilesCompileOrder += path to 0 }
 
-        // TODO: hack => get all project classpath
-//        val deps = mutableSetOf<Dependency>()
-//        moduleDependencies.values.forEach { ////////
-//            deps += it
-//                .filterNot { it is Dependency.Project && resolver.isIgnoredModule(it.moduleName) }
-//                .filterNot { it is Dependency.Library && it.relation == Relation.ANDROID_TEST_IMPLEMENTATION }
-//                .filterNot { it is Dependency.Library && it.relation == Relation.TEST_IMPLEMENTATION }
-//        }
         return ProjectResolverOutput(sourceFilesClasspath, sourceFilesCompileOrder)
     }
 
-    private fun isFileSupported(path: String) = path.trim().endsWith(".java")
+    private fun getModuleName(sourceFile: String): String {
+        val parts = sourceFile.split("/")
+        val srcDirIndex = parts.indexOf("src")
+
+        if (srcDirIndex == -1) {
+            error("Failed to get module name for source file: $sourceFile")
+        }
+        return parts[srcDirIndex - 1]
+    }
+
+    private fun buildClasspathForSourceFile(
+        sourceFilePath: String,
+        androidSdkPath: String,
+        moduleNameToPathMap: Map<String, String>,
+        fileCacheResources: Set<GradleCacheItem>,
+        jetifiedResources: Map<String, Set<String>>,
+    ): Set<String> {
+        val sourceFile = File(sourceFilePath)
+
+        if (!sourceFile.exists()) {
+            error("Source file doesn't exist: $sourceFilePath")
+        }
+        val moduleName = getModuleName(sourceFilePath)
+        check(moduleNameToPathMap.containsKey(moduleName)) { "No module with name: $moduleName" }
+
+        // TODO: source files from the same module => same classpath
+        Telemetry.log("Building classpath for ${sourceFile.name} (module: $moduleName)")
+
+        val projects = mutableSetOf<String>()
+        val libs = mutableSetOf<Pair<String, String>>()
+        val resolveProject = { line: String -> // TODO: refactor
+            line.substring(line.indexOf(":") + 1, line.length)
+                .replace("(*)", "")
+                .replace(":", "/")
+                .trim()
+        }
+        val resolveLibrary = { line: String -> // TODO: refactor
+            var artifact = line.substring(0, line.lastIndexOf(":"))
+                .replace("(*)", "")
+                .trim()
+            var version = line.substring(line.lastIndexOf(":") + 1, line.length)
+
+            if (version.contains("->")) {
+                version = version.substring(version.indexOf("->") + 2, version.length)
+            }
+            version = version.replace("(c)", "")
+                .replace("(*)", "")
+                .trim()
+
+            if (!artifact.contains(":")) {
+                artifact = line.substring(0, line.indexOf("->")).trim()
+            }
+            artifact to version
+        }
+        var insideBlock = false
+        val depsOutputFile = File("$GREENCAT_DEPS_OUTPUT_PATH/$moduleName")
+
+        if (!depsOutputFile.exists()) {
+            error("Missing dependencies output file: ${depsOutputFile.absolutePath}")
+        }
+        depsOutputFile.readLines()
+            .forEach {
+                var line = it
+
+                if (!insideBlock && line.trim().startsWith("+---")) { // TODO: refactor
+                    insideBlock = true
+                }
+                if (insideBlock && line.isBlank()) {
+                    insideBlock = false
+                }
+                if (insideBlock) {
+                    line = line.substring(line.indexOf("- ") + 2, line.length) // TODO: refactor
+                    when {
+                        line.startsWith("project ") -> {
+                            projects += resolveProject(line)
+                        }
+                        else -> {
+                            if (line.contains("-> project")) { // TODO: WTF???
+                                val parts = line.split("->")
+                                val left = parts[0]
+                                val right = parts[1]
+                                projects += resolveProject(right)
+                                libs += resolveLibrary(left)
+                            } else {
+                                libs += resolveLibrary(line)
+                            }
+                        }
+                    }
+                }
+            }
+        projects += moduleName // Add module itself!
+        projects.forEach { name ->
+            val path = moduleNameToPathMap[name]
+            checkNotNull(path) { "No path for project: $name" }
+        }
+        val jarPaths = mutableSetOf<String>()
+
+        // Libraries from Gradle cache
+        libs
+            .forEach { (artifact, version) ->
+                val index = artifact.indexOf(":")
+
+                if (index == -1) {
+                    error("Failed to parse artifact: $artifact")
+                }
+                val key = artifact.substring(index + 1, artifact.length) + "-$version"
+
+                when (val paths = jetifiedResources[key]) {
+                    null -> {
+                        val archives = fileCacheResources.filterIsInstance<GradleCacheItem.Archive>()
+                            .filter { res -> artifact == "${res.pkg}:${res.artifact}" }
+
+                        if (archives.isEmpty()) {
+                            Telemetry.err("No support or jetified resources found for artifact: $key")
+                        } else {
+                            jarPaths += archives.map { res -> res.fullPath }
+                        }
+                    }
+                    else -> {
+                        jarPaths += paths
+                    }
+                }
+            }
+        val classpath = mutableSetOf<String>()
+
+        // Android SDK
+        File(androidSdkPath).apply {
+            if (!exists()) {
+                error("No Android SDK found: $androidSdkPath")
+            }
+            val dirs = File("$androidSdkPath/platforms").listFiles { file -> file.isDirectory } ?: emptyArray()
+
+            if (dirs.isEmpty()) {
+                error("No Android platforms installed")
+            }
+            val platformDir = dirs.sortedDescending()[0]
+            classpath += "${platformDir.absolutePath}/android.jar".apply { checkPathExists(this) }
+            classpath += "${platformDir.absolutePath}/data/res".apply { checkPathExists(this) }
+        }
+        // Projects' build directories
+        projects.forEach { name ->
+            val modulePath = moduleNameToPathMap[name]
+            checkNotNull(modulePath) { "No path for module: $name" }
+            val buildPath = "$CURRENT_DIR/$modulePath/build"
+            checkPathExists(buildPath)
+
+            // TODO: refactor
+            "$buildPath/intermediates/javac/debug/classes".apply { if (File(this).exists()) classpath += this }
+            "$buildPath/intermediates/compile_r_class_jar/debug/R.jar".apply { if (File(this).exists()) classpath += this }
+            "$buildPath/intermediates/compile_and_runtime_not_namespaced_r_class_jar/debug/R.jar".apply { if (File(this).exists()) classpath += this }
+            "$buildPath/tmp/kotlin-classes/debug".apply { if (File(this).exists()) classpath += this }
+            "$buildPath/tmp/kapt3/classes/debug".apply { if (File(this).exists()) classpath += this }
+            "$buildPath/generated/res/resValues/debug".apply { if (File(this).exists()) classpath += this }
+            "$buildPath/generated/res/rs/debug".apply { if (File(this).exists()) classpath += this }
+            "$buildPath/generated/crashlytics/res/debug".apply { if (File(this).exists()) classpath += this }
+            "$buildPath/generated/res/google-services/debug".apply { if (File(this).exists()) classpath += this }
+        }
+        jarPaths.forEach { path -> checkPathExists(path) }
+        classpath += jarPaths
+        return classpath
+    }
+
+    private fun checkPathExists(path: String) = check(File(path).exists()) { "Path doesn't exist: $path" }
 
     private companion object {
-        const val GRADLE_CACHE_PATH = "~/.gradle/caches/modules-2/files-2.1" // TODO: suffixes can be different
+        // TODO: suffixes can be different
+        val GRADLE_RESOURCES_CACHE_PATH = "~/.gradle/caches/modules-2/files-2.1".noTilda()
+        val JETIFIED_RESOURCES_CACHE_PATH = "~/.gradle/caches/transforms-3".noTilda()
+        val GREENCAT_DEPS_OUTPUT_PATH = "~/greencat/deps".noTilda()
     }
 }

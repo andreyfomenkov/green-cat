@@ -10,6 +10,11 @@ val HOME_DIR: String = exec("echo ~").firstOrNull().let { path ->
     }
 }
 
+fun String.noTilda() = when {
+    trim().startsWith("~") -> replace("~", HOME_DIR)
+    else -> this
+}
+
 fun formatMillis(value: Long) = when {
     value < 1000 -> "$value ms"
     else -> "${"%.1f".format(value / 1000f)} sec".replace(",", ".")
