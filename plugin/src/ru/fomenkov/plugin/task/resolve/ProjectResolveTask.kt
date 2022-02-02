@@ -3,10 +3,7 @@ package ru.fomenkov.plugin.task.resolve
 import ru.fomenkov.plugin.resolver.GradleCacheItem
 import ru.fomenkov.plugin.resolver.ProjectResolver
 import ru.fomenkov.plugin.task.Task
-import ru.fomenkov.plugin.util.CURRENT_DIR
-import ru.fomenkov.plugin.util.HOME_DIR
-import ru.fomenkov.plugin.util.Telemetry
-import ru.fomenkov.plugin.util.noTilda
+import ru.fomenkov.plugin.util.*
 import java.io.File
 import java.util.concurrent.Callable
 import java.util.concurrent.Executors
@@ -213,6 +210,17 @@ class ProjectResolveTask(
             "$buildPath/generated/res/rs/debug".apply { if (File(this).exists()) classpath += this }
             "$buildPath/generated/crashlytics/res/debug".apply { if (File(this).exists()) classpath += this }
             "$buildPath/generated/res/google-services/debug".apply { if (File(this).exists()) classpath += this }
+
+            // Local lib directory if any
+            File("$modulePath/libs").apply {
+                if (exists()) {
+                    exec("find $absolutePath -name '*.jar'").forEach { localJar ->
+                        if (File(localJar).exists()) {
+                            classpath += localJar
+                        }
+                    }
+                }
+            }
         }
         jarPaths.forEach { path -> checkPathExists(path) }
         classpath += jarPaths

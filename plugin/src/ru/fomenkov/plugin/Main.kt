@@ -69,6 +69,7 @@ private fun compileSourceFiles(compilationInfo: ProjectResolverOutput) {
         if (hasError) {
             lines.forEach { line -> Telemetry.err("[JAVAC] $line") }
         } else {
+            lines.forEach { line -> Telemetry.log("[JAVAC] $line") }
             Telemetry.log("[JAVAC] Build successful")
         }
     }
