@@ -112,7 +112,15 @@ class ProjectResolveTask(
         val depsOutputFile = File("$GREENCAT_DEPS_OUTPUT_PATH/$moduleName")
 
         if (!depsOutputFile.exists()) {
-            error("Missing dependencies output file: ${depsOutputFile.absolutePath}")
+            Telemetry.log("Generating Gradle dependency output for module $moduleName...")
+            val outputFilePath = depsOutputFile.absolutePath
+            val cmd = "./gradlew $moduleName:dependencies --configuration debugCompileClasspath > $outputFilePath"
+            val hasErrors = exec(cmd, print = true).find { line -> line.contains("BUILD FAILED") } != null
+
+            if (hasErrors) {
+                exec("rm ${depsOutputFile.absolutePath}")
+                error("Failed to generate dependency tree")
+            }
         }
         depsOutputFile.readLines()
             .forEach {
@@ -248,5 +256,6 @@ class ProjectResolveTask(
         val SUPPORT_RESOURCES_CACHE_PATH = "~/.gradle/caches/modules-2/files-2.1".noTilda()
         val JETIFIED_RESOURCES_CACHE_PATH = "~/.gradle/caches/transforms-3".noTilda()
         val GREENCAT_DEPS_OUTPUT_PATH = "~/greencat/deps".noTilda()
+        val GREENCAT_DEX_PATH = "~/greencat/dex".noTilda()
     }
 }
