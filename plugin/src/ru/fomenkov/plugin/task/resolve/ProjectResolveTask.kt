@@ -4,9 +4,12 @@ import ru.fomenkov.plugin.resolver.GradleCacheItem
 import ru.fomenkov.plugin.resolver.ProjectResolver
 import ru.fomenkov.plugin.task.Task
 import ru.fomenkov.plugin.util.CURRENT_DIR
+import ru.fomenkov.plugin.util.HOME_DIR
 import ru.fomenkov.plugin.util.Telemetry
 import ru.fomenkov.plugin.util.noTilda
 import java.io.File
+import java.util.concurrent.Callable
+import java.util.concurrent.Executors
 
 class ProjectResolveTask(
     private val input: ProjectResolverInput,
@@ -22,10 +25,17 @@ class ProjectResolveTask(
         Telemetry.log("Project has ${moduleDeclarations.size} module(s)")
         Telemetry.log("Resolving project dependencies...")
 
-        // TODO: optimize
-        val fileCacheResources = resolver.findAllResourcesInGradleCache(GRADLE_RESOURCES_CACHE_PATH)
-        val jetifiedResources = resolver.findAllJetifiedJarsInGradleCache(JETIFIED_RESOURCES_CACHE_PATH)
+        val executor = Executors.newFixedThreadPool(2)
+        val supportResFuture = executor.submit(
+            Callable { resolver.findAllResourcesInGradleCache(SUPPORT_RESOURCES_CACHE_PATH) }
+        )
+        val jetifiedResFuture = executor.submit(
+            Callable { resolver.findAllJetifiedJarsInGradleCache(JETIFIED_RESOURCES_CACHE_PATH) }
+        )
+        val supportCacheResources = supportResFuture.get()
+        val jetifiedCacheResources = jetifiedResFuture.get()
         val moduleNameToPathMap = moduleDeclarations.associate { it.name to it.path } // TODO: refactor
+        executor.shutdown()
 
         // TODO: fill in sourceFilesClasspath and sourceFilesCompileOrder
         val sourceFilesClasspath = mutableMapOf<String, Set<String>>()
@@ -36,8 +46,8 @@ class ProjectResolveTask(
                 sourceFilePath = sourceFile,
                 androidSdkPath = input.androidSdkPath,
                 moduleNameToPathMap = moduleNameToPathMap,
-                fileCacheResources = fileCacheResources,
-                jetifiedResources = jetifiedResources,
+                fileCacheResources = supportCacheResources,
+                jetifiedResources = jetifiedCacheResources,
             )
             sourceFilesClasspath += sourceFile to classpath
         }
@@ -206,14 +216,28 @@ class ProjectResolveTask(
         }
         jarPaths.forEach { path -> checkPathExists(path) }
         classpath += jarPaths
-        return classpath
+        return classpath // TODO: implement filtering
+            .map { path -> path.replace(CURRENT_DIR, ".") }
+            .filterNot { path -> path.endsWith("-javadoc.jar") }
+            .filterNot { path -> path.endsWith("-sources.jar") }
+            .filterNot { path ->
+                val file = File(path)
+                file.isDirectory && file.list().isNullOrEmpty()
+            }
+            .map { path ->
+                when {
+                    path.contains("/.gradle/") -> path.replace(HOME_DIR, "../..")
+                    else -> path
+                }
+            }
+            .toSet()
     }
 
     private fun checkPathExists(path: String) = check(File(path).exists()) { "Path doesn't exist: $path" }
 
     private companion object {
         // TODO: suffixes can be different
-        val GRADLE_RESOURCES_CACHE_PATH = "~/.gradle/caches/modules-2/files-2.1".noTilda()
+        val SUPPORT_RESOURCES_CACHE_PATH = "~/.gradle/caches/modules-2/files-2.1".noTilda()
         val JETIFIED_RESOURCES_CACHE_PATH = "~/.gradle/caches/transforms-3".noTilda()
         val GREENCAT_DEPS_OUTPUT_PATH = "~/greencat/deps".noTilda()
     }

@@ -161,12 +161,12 @@ class ProjectResolver(
                                     fullPath = resourceFile.path,
                                 )
                             } else if (resourceFile.extension == "pom") {
-                                items += parsePomFile(
-                                    pkg = packageDir.name,
-                                    artifact = artifactDir.name,
-                                    version = versionDir.name,
-                                    pomFile = resourceFile,
-                                )
+//                                items += parsePomFile(
+//                                    pkg = packageDir.name,
+//                                    artifact = artifactDir.name,
+//                                    version = versionDir.name,
+//                                    pomFile = resourceFile,
+//                                )
                             }
                         }
                     }

@@ -19,6 +19,8 @@ fun main(args: Array<String>) = try {
     Telemetry.isVerbose = false
     val msec = timeMillis {
         launch(
+            androidSdkPath = args[0],  // TODO: for debug
+            srcFiles = setOf(args[1]), // TODO: for debug
         )
     }
     Telemetry.log("Execution complete in ${formatMillis(msec)}")
@@ -58,6 +60,9 @@ private fun compileSourceFiles(compilationInfo: ProjectResolverOutput) {
 
     compilationInfo.sourceFilesClasspath.forEach { (srcFile, classpath) ->
         val cp = classpath.joinToString(separator = ":")
+
+        Telemetry.log("CLASSPATH ${cp.length / 1000}k symbols")
+
         val lines = exec("javac -cp $cp -d ~/tmp $srcFile")
         val hasError = lines.find { line -> line.contains("error: ") } != null
 
