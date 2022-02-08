@@ -10,7 +10,6 @@ import ru.fomenkov.plugin.util.exec
 import ru.fomenkov.plugin.util.formatMillis
 import ru.fomenkov.plugin.util.timeMillis
 import java.io.File
-import java.io.FileFilter
 
 private const val GRADLE_PROPERTIES_FILE_NAME = "gradle.properties"
 private const val GRADLE_SETTINGS_FILE_NAME = "settings.gradle"
@@ -66,7 +65,7 @@ private fun compileAndDexSourceFiles(compilationInfo: ProjectResolverOutput, and
 
         Telemetry.log("CLASSPATH ${cp.length / 1000}k symbols")
 
-        val lines = exec("javac -cp $cp -d ~/greencat/tmp $srcFile")
+        val lines = exec("javac -encoding utf-8 -cp $cp -d ~/greencat/tmp $srcFile")
         val hasError = lines.find { line -> line.contains("error: ") } != null
 
         if (hasError) {

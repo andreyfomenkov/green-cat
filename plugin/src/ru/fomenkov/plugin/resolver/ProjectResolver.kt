@@ -516,6 +516,7 @@ class ProjectResolver(
                     }
                     "$CURRENT_DIR/$modulePath".let { dir ->
                         classpath += "$dir/build/intermediates/javac/debug/classes"
+                        classpath += "$dir/build/intermediates/javac/debugAndroidTest/classes"
 
                         // TODO: refactor. Find the exact 'compile_*_r_class_jar' directory
                         classpath += "$dir/build/intermediates/compile_r_class_jar/debug/R.jar"

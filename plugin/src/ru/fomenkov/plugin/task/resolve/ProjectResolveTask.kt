@@ -54,6 +54,9 @@ class ProjectResolveTask(
         return ProjectResolverOutput(sourceFilesClasspath, sourceFilesCompileOrder)
     }
 
+    private val mappedModules = mapOf( // TODO: for UI tests
+    )
+
     private fun getModuleName(sourceFile: String): String {
         val parts = sourceFile.split("/")
         val srcDirIndex = parts.indexOf("src")
@@ -61,7 +64,9 @@ class ProjectResolveTask(
         if (srcDirIndex == -1) {
             error("Failed to get module name for source file: $sourceFile")
         }
-        return parts[srcDirIndex - 1]
+        val sourceName = parts[srcDirIndex - 1]
+        val mappedName = mappedModules[sourceName]
+        return mappedName ?: sourceName
     }
 
     private fun buildClasspathForSourceFile(
@@ -114,7 +119,7 @@ class ProjectResolveTask(
         if (!depsOutputFile.exists()) {
             Telemetry.log("Generating Gradle dependency output for module $moduleName...")
             val outputFilePath = depsOutputFile.absolutePath
-            val cmd = "./gradlew $moduleName:dependencies --configuration debugCompileClasspath > $outputFilePath"
+            val cmd = "./gradlew $moduleName:dependencies --configuration debugAndroidTestCompileClasspath > $outputFilePath"
             val hasErrors = exec(cmd, print = true).find { line -> line.contains("BUILD FAILED") } != null
 
             if (hasErrors) {
@@ -210,6 +215,7 @@ class ProjectResolveTask(
 
             // TODO: refactor
             "$buildPath/intermediates/javac/debug/classes".apply { if (File(this).exists()) classpath += this }
+            "$buildPath/intermediates/javac/debugAndroidTest/classes".apply { if (File(this).exists()) classpath += this }
             "$buildPath/intermediates/compile_r_class_jar/debug/R.jar".apply { if (File(this).exists()) classpath += this }
             "$buildPath/intermediates/compile_and_runtime_not_namespaced_r_class_jar/debug/R.jar".apply { if (File(this).exists()) classpath += this }
             "$buildPath/tmp/kotlin-classes/debug".apply { if (File(this).exists()) classpath += this }
