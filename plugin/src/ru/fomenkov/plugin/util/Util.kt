@@ -28,3 +28,5 @@ fun timeMillis(action: () -> Unit): Long {
     val end = System.currentTimeMillis()
     return end - start
 }
+
+fun isFileSupported(path: String) = path.trim().endsWith(".java")

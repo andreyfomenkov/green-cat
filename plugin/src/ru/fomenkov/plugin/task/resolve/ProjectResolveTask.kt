@@ -55,6 +55,7 @@ class ProjectResolveTask(
     }
 
     private val mappedModules = mapOf( // TODO: for UI tests
+        "ok-android-test" to "odnoklassniki-android",
     )
 
     private fun getModuleName(sourceFile: String): String {
