@@ -4,6 +4,7 @@ data class RunnerParams(
     val sshHost: String,
     val projectRoot: String,
     val androidSdkRoot: String,
+    val greencatRoot: String,
     val mode: RunnerMode,
 )
 
@@ -24,8 +25,9 @@ enum class Param(
     val description: String,
 ) {
     SSH_HOST(key = "-h", description = "Remote SSH hostname or alias"),
-    PROJECT_ROOT(key = "-p", description = "Android project root on the remote host"),
-    ANDROID_SDK_ROOT(key = "-s", description = "Android SDK root on the remote host"),
+    PROJECT_ROOT(key = "-p", description = "Android project root directory on the remote host"),
+    ANDROID_SDK_ROOT(key = "-s", description = "Android SDK root directory on the remote host"),
+    GREENCAT_ROOT(key = "-g", description = "GreenCat root directory on the remote host"),
     RUNNER_MODE(key = "-m", description = "Runner mode (debug or uitest)"),
     COMPONENT_NAME(key = "-c", description = "Component name for main activity in 'debug' mode"),
     TEST_CLASS(key = "-t", description = "Espresso test canonical class name in 'uitest' mode"),

@@ -35,6 +35,7 @@ class ParamsReader(
             sshHost = value(Param.SSH_HOST),
             projectRoot = value(Param.PROJECT_ROOT),
             androidSdkRoot = value(Param.ANDROID_SDK_ROOT),
+            greencatRoot = value(Param.GREENCAT_ROOT),
             mode = mode,
         )
     }
