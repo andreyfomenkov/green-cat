@@ -9,6 +9,7 @@ import ru.fomenkov.runner.params.RunnerParams
 import ru.fomenkov.runner.ssh.setRemoteHost
 import ru.fomenkov.runner.ssh.ssh
 import java.io.File
+import kotlin.random.Random
 
 fun main(args: Array<String>) = try {
     launch(args)
@@ -28,10 +29,7 @@ private fun launch(args: Array<String>) {
 
     val supported = checkGitDiff() ?: return
     syncWithMainframer(params, supported)
-
-    if (isNeedUpdate(params)) {
-        downloadUpdate()
-    }
+    checkForUpdate(params)
 }
 
 private fun checkGitDiff(): List<String>? {
@@ -60,22 +58,70 @@ private fun checkGitDiff(): List<String>? {
     return supported
 }
 
-private fun isNeedUpdate(params: RunnerParams): Boolean {
-    val jarPath = "${params.greencatRoot}/$GREENCAT_JAR"
-    val exists = ssh { cmd("ls $jarPath && echo OK") }.firstOrNull() == "OK"
-
-    return if (exists) {
-        Log.d("Checking for updates...")
-        val version = ssh { cmd("java -jar $jarPath -v") }.firstOrNull()?.trim() ?: ""
-        // TODO: periodic check with versions comparison
-        false
-    } else {
-        true
-    }
+private fun isNeedToCheckVersion(): Boolean {
+    //return Random.nextInt(from = 1, until = 5) == 3 // TODO: store timestamp
+    return true
 }
 
-private fun downloadUpdate() {
-    Log.d("Downloading update...")
+private fun checkForUpdate(params: RunnerParams) {
+    val remoteJarPath = "${params.greencatRoot}/$GREENCAT_JAR"
+    val exists = ssh { cmd("ls $remoteJarPath && echo OK") }.find { line -> line.trim() == "OK" } != null
+
+    fun getVersionInfo(): Pair<String, String> {
+        val lines = exec("curl -s $ARTIFACT_VERSION_INFO_URL")
+
+        if (lines.size == 2) {
+            val version = lines.first().trim()
+            val artifactUrl = lines.last().trim()
+            return version to artifactUrl
+        } else {
+            lines.forEach { line -> Log.e("[CURL] $line") }
+            error("Failed to download version-info")
+        }
+    }
+    fun downloadUpdate(version: String, artifactUrl: String) {
+        Log.d("Downloading update...")
+        val tmpDir = exec("echo \$TMPDIR").firstOrNull() ?: ""
+
+        check(tmpDir.isNotBlank()) { "Unable to get /tmp directory" }
+        exec("curl -s $artifactUrl > $tmpDir/$GREENCAT_JAR")
+
+        val tmpJarPath = "$tmpDir/$GREENCAT_JAR"
+
+        if (!File(tmpJarPath).exists()) {
+            error("Error downloading $GREENCAT_JAR to /tmp directory")
+        }
+        ssh { cmd("rm $remoteJarPath") }
+        val isDeleted = ssh { cmd("ls $remoteJarPath && echo OK") }.find { line -> line.trim() == "OK" } == null
+
+        if (!isDeleted) {
+            error("Failed to delete old JAR version on the remote host")
+        }
+        exec("scp $tmpJarPath ${params.sshHost}:$remoteJarPath")
+        val isUpdated = ssh { cmd("ls $remoteJarPath && echo OK") }.find { line -> line.trim() == "OK" } != null
+
+        when {
+            isUpdated -> Log.d("Done. GreenCat updated to v$version")
+            else -> error("Error uploading $GREENCAT_JAR to the remote host")
+        }
+    }
+    if (exists) {
+        if (isNeedToCheckVersion()) {
+            Log.d("Checking version for update...")
+
+            val curVersion = ssh { cmd("java -jar $remoteJarPath -v") }.firstOrNull()?.trim() ?: ""
+            val (updVersion, artifactUrl) = getVersionInfo()
+
+            if (curVersion == updVersion) {
+                Log.d("Everything is up to date")
+            } else {
+                downloadUpdate(updVersion, artifactUrl)
+            }
+        }
+    } else {
+        val (updVersion, artifactUrl) = getVersionInfo()
+        downloadUpdate(updVersion, artifactUrl)
+    }
 }
 
 private fun syncWithMainframer(
@@ -120,7 +166,7 @@ private fun readParams(args: Array<String>) = when (args.isEmpty()) {
 }
 
 private fun validateShellCommands() {
-    listOf("git", "adb", "find", "rm", "ls", "ssh", "scp").forEach { cmd ->
+    listOf("git", "adb", "find", "rm", "ls", "ssh", "scp", "curl").forEach { cmd ->
         val exists = exec("command -v $cmd").isNotEmpty()
 
         if (!exists) {
@@ -134,3 +180,5 @@ private const val SOURCE_FILES_DIR = "src"
 private const val CLASS_FILES_DIR = "class"
 private const val DEX_FILES_DIR = "dex"
 private const val GREENCAT_JAR = "greencat.jar"
+// TODO: change URL with the branch name (master-v2 -> master)
+private const val ARTIFACT_VERSION_INFO_URL = "https://raw.githubusercontent.com/andreyfomenkov/green-cat/master-v2/artifacts/version-info"
