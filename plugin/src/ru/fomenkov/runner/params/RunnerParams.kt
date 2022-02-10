@@ -6,6 +6,7 @@ data class RunnerParams(
     val androidSdkRoot: String,
     val greencatRoot: String,
     val mode: RunnerMode,
+    val modulesMap: Map<String, String>,
 )
 
 sealed class RunnerMode {
@@ -32,6 +33,7 @@ enum class Param(
     COMPONENT_NAME(key = "-c", description = "Component name for main activity in 'debug' mode"),
     TEST_CLASS(key = "-t", description = "Espresso test canonical class name in 'uitest' mode"),
     TEST_RUNNER(key = "-r", description = "Espresso test runner in 'uitest' mode"),
+    MAPPED_MODULES(key = "-a", description = "Mapped modules, ':' splitted, comma separated")
 }
 
 enum class Mode(val mode: String) {

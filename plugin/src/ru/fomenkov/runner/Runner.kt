@@ -21,7 +21,8 @@ fun main(args: Array<String>) = try {
 }
 
 private fun launch(args: Array<String>) {
-    Log.d("Starting GreenCat Runner\n")
+    Log.d("Starting GreenCat Runner")
+    Log.d("GitHub: $PROJECT_GITHUB\n")
     validateShellCommands()
 
     val params = readParams(args) ?: return
@@ -30,6 +31,11 @@ private fun launch(args: Array<String>) {
     val supported = checkGitDiff() ?: return
     syncWithMainframer(params, supported)
     checkForUpdate(params)
+    startGreenCatPlugin()
+}
+
+private fun startGreenCatPlugin() {
+    // TODO
 }
 
 private fun checkGitDiff(): List<String>? {
@@ -59,8 +65,7 @@ private fun checkGitDiff(): List<String>? {
 }
 
 private fun isNeedToCheckVersion(): Boolean {
-    //return Random.nextInt(from = 1, until = 5) == 3 // TODO: store timestamp
-    return true
+    return Random.nextInt(from = 1, until = 5) == 3 // TODO: store timestamp
 }
 
 private fun checkForUpdate(params: RunnerParams) {
@@ -107,8 +112,6 @@ private fun checkForUpdate(params: RunnerParams) {
     }
     if (exists) {
         if (isNeedToCheckVersion()) {
-            Log.d("Checking version for update...")
-
             val curVersion = ssh { cmd("java -jar $remoteJarPath -v") }.firstOrNull()?.trim() ?: ""
             val (updVersion, artifactUrl) = getVersionInfo()
 
@@ -175,10 +178,11 @@ private fun validateShellCommands() {
     }
 }
 
-private const val CLASSPATH_DIR = "cp"
-private const val SOURCE_FILES_DIR = "src"
-private const val CLASS_FILES_DIR = "class"
-private const val DEX_FILES_DIR = "dex"
+private const val PROJECT_GITHUB = "https://github.com/andreyfomenkov/green-cat"
 private const val GREENCAT_JAR = "greencat.jar"
+const val CLASSPATH_DIR = "cp"
+const val SOURCE_FILES_DIR = "src"
+const val CLASS_FILES_DIR = "class"
+const val DEX_FILES_DIR = "dex"
 // TODO: change URL with the branch name (master-v2 -> master)
 private const val ARTIFACT_VERSION_INFO_URL = "https://raw.githubusercontent.com/andreyfomenkov/green-cat/master-v2/artifacts/version-info"

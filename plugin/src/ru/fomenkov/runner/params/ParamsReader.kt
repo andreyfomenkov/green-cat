@@ -37,7 +37,24 @@ class ParamsReader(
             androidSdkRoot = value(Param.ANDROID_SDK_ROOT),
             greencatRoot = value(Param.GREENCAT_ROOT),
             mode = mode,
+            modulesMap = splitToMappedModules(paramsMap[Param.MAPPED_MODULES]),
         )
+    }
+
+    private fun splitToMappedModules(value: String?) = when (value.isNullOrBlank()) {
+        true -> emptyMap()
+        else -> {
+            val map = mutableMapOf<String, String>()
+            value.split(",")
+                .forEach { entry ->
+                    val parts = entry.split(":")
+                    check(parts.size == 2) { "Failed to get mapped modules from value: $value" }
+                    val moduleFrom = parts.first()
+                    val moduleTo = parts.last()
+                    map += moduleFrom to moduleTo
+                }
+            map
+        }
     }
 
     private fun parseParam(value: String) = checkNotNull(keysMap[value]) { "Unknown parameter: $value" }
