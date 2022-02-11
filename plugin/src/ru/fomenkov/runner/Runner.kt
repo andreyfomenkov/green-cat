@@ -1,7 +1,6 @@
 package ru.fomenkov.runner
 
-import ru.fomenkov.plugin.util.exec
-import ru.fomenkov.plugin.util.isFileSupported
+import ru.fomenkov.plugin.util.*
 import ru.fomenkov.runner.diff.GitDiffParser
 import ru.fomenkov.runner.logger.Log
 import ru.fomenkov.runner.params.ParamsReader
@@ -12,7 +11,9 @@ import java.io.File
 import kotlin.random.Random
 
 fun main(args: Array<String>) = try {
-    launch(args)
+    val time = timeMillis { launch(args) }
+    displayTotalTime(time)
+
 } catch (error: Throwable) {
     when (error.message.isNullOrBlank()) {
         true -> Log.e("Process execution failed")
@@ -22,7 +23,7 @@ fun main(args: Array<String>) = try {
 
 private fun launch(args: Array<String>) {
     Log.d("Starting GreenCat Runner")
-    Log.d("GitHub: $PROJECT_GITHUB\n")
+    Log.d("Project on GitHub: $PROJECT_GITHUB\n")
     validateShellCommands()
 
     val params = readParams(args) ?: return
@@ -31,11 +32,33 @@ private fun launch(args: Array<String>) {
     val supported = checkGitDiff() ?: return
     syncWithMainframer(params, supported)
     checkForUpdate(params)
-    startGreenCatPlugin()
+    startGreenCatPlugin(params)
 }
 
-private fun startGreenCatPlugin() {
-    // TODO
+private fun displayTotalTime(time: Long) {
+    val str = "│  Deployed in ${formatMillis(time)}  │"
+    val border = "─".repeat(str.length - 2)
+    val space = " ".repeat(str.length - 2)
+
+    Log.d("\n")
+    Log.d("╭$border╮")
+    Log.d("│$space│")
+    Log.d(str)
+    Log.d("│$space│")
+    Log.d("╰$border╯")
+}
+
+private fun startGreenCatPlugin(params: RunnerParams) {
+    val greencatJar = "${params.greencatRoot}/$GREENCAT_JAR"
+    val version = ssh { cmd("java -jar $greencatJar -v") }.firstOrNull() ?: "???"
+    Log.d("Launching GreenCat v$version on the remote host")
+
+    val mappedModulesParam = formatMappedModulesParameter(params.modulesMap)
+    val output = ssh(print = true) {
+        cmd("cd ${params.projectRoot}")
+        cmd("java -jar $greencatJar -s ${params.androidSdkRoot} -g ${params.greencatRoot} $mappedModulesParam")
+    }
+    output.forEach(Log::d)
 }
 
 private fun checkGitDiff(): List<String>? {
@@ -63,6 +86,16 @@ private fun checkGitDiff(): List<String>? {
     }
     return supported
 }
+
+private fun formatMappedModulesParameter(mappedModules: Map<String, String>) =
+    when (mappedModules.isEmpty()) {
+        true -> ""
+        else -> {
+            "-a " + mappedModules.entries.joinToString(separator = ",") { (moduleFrom, moduleTo) ->
+                "$moduleFrom:$moduleTo"
+            }
+        }
+    }
 
 private fun isNeedToCheckVersion(): Boolean {
     return Random.nextInt(from = 1, until = 5) == 3 // TODO: store timestamp
@@ -136,7 +169,6 @@ private fun syncWithMainframer(
     ssh {
         cmd("mkdir -p ${params.greencatRoot}")
         cmd("cd ${params.greencatRoot}")
-        cmd("rm -rf $CLASSPATH_DIR; mkdir $CLASSPATH_DIR")
         cmd("rm -rf $SOURCE_FILES_DIR; mkdir $SOURCE_FILES_DIR")
         cmd("rm -rf $CLASS_FILES_DIR; mkdir $CLASS_FILES_DIR")
         cmd("rm -rf $DEX_FILES_DIR; mkdir $DEX_FILES_DIR")
