@@ -37,7 +37,7 @@ private fun launch(args: Array<String>) {
         androidSdkRoot = params.androidSdkRoot,
         projectInfo = projectInfo,
     ).run()
-    Telemetry.log("Build successful")
+    Telemetry.log("DEX file successfully generated")
 }
 
 private fun readParams(args: Array<String>) = when {

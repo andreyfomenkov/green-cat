@@ -9,7 +9,6 @@ import ru.fomenkov.runner.CLASS_FILES_DIR
 import ru.fomenkov.runner.DEX_FILES_DIR
 import ru.fomenkov.runner.OUTPUT_DEX_FILE
 import java.io.File
-import java.io.FileFilter
 
 class CompileTask(
     private val greencatRoot: String,
@@ -113,57 +112,3 @@ class CompileTask(
         data class Error(val moduleName: String, val output: List<String>) : CompilationResult()
     }
 }
-
-//private fun compileAndDexSourceFiles(compilationInfo: ProjectResolverOutput, androidSdkPath: String) {
-//    Telemetry.log("Compiling with javac...")
-//    exec("rm -rf ~/greencat/tmp && mkdir ~/greencat/tmp")
-//    exec("rm -rf ~/greencat/dex && mkdir ~/greencat/dex")
-//
-//    compilationInfo.sourceFilesClasspath.forEach { (srcFile, classpath) ->
-//        val cp = classpath.joinToString(separator = ":")
-//
-//        Telemetry.log("CLASSPATH ${cp.length / 1000}k symbols")
-//
-//        val lines = exec("javac -encoding utf-8 -cp $cp -d ~/greencat/tmp $srcFile")
-//        val hasError = lines.find { line -> line.contains("error: ") } != null
-//
-//        if (hasError) {
-//            lines.forEach { line -> Telemetry.err("[JAVAC] $line") }
-//        } else {
-//            lines.forEach { line -> Telemetry.log("[JAVAC] $line") }
-//            Telemetry.log("[JAVAC] Build successful")
-//        }
-//    }
-//    Telemetry.log("\nListing compiled .class files:")
-//    val classFilePaths = exec("find ~/greencat/tmp -name '*.class'", print = true)
-//
-//    Telemetry.log("\nLooking for D8")
-//    val d8ToolPath = File("$androidSdkPath/build-tools").run {
-//        if (!exists()) {
-//            error("No build-tools directory in Android SDK: $absolutePath")
-//        }
-//        val dirs = listFiles { file -> file.isDirectory }
-//
-//        if (dirs.isNullOrEmpty()) {
-//            error("No build tools installed")
-//        }
-//        val buildToolsDir = dirs.sortedDescending()[0]
-//        val d8ToolPath = "${buildToolsDir.absolutePath}/d8"
-//
-//        if (File(d8ToolPath).exists()) {
-//            Telemetry.log("Using $d8ToolPath")
-//        } else {
-//            error("No D8 tool found in ${buildToolsDir.absolutePath}")
-//        }
-//        d8ToolPath
-//    }
-//    Telemetry.log("\nDexing...")
-//    Telemetry.log("Found ${classFilePaths.size} class(es)")
-//
-//    // See https://stackoverflow.com/questions/30081386/how-to-put-specific-classes-into-main-dex-file!
-//    val cmd = "$d8ToolPath ${classFilePaths.filterNot { it.contains("$") }.joinToString(separator = " ")} --output ~/greencat/dex"
-//    Telemetry.log("CMD: $cmd")
-//    exec(cmd).forEach { line -> Telemetry.log("[D8] $line") }
-//
-//    exec("echo; ls -lh ~/greencat/dex", print = true)
-//}
