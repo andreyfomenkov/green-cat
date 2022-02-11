@@ -184,5 +184,6 @@ const val CLASSPATH_DIR = "cp"
 const val SOURCE_FILES_DIR = "src"
 const val CLASS_FILES_DIR = "class"
 const val DEX_FILES_DIR = "dex"
+const val OUTPUT_DEX_FILE = "delta.dex"
 // TODO: change URL with the branch name (master-v2 -> master)
 private const val ARTIFACT_VERSION_INFO_URL = "https://raw.githubusercontent.com/andreyfomenkov/green-cat/master-v2/artifacts/version-info"

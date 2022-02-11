@@ -2,6 +2,7 @@ package ru.fomenkov.plugin.task.resolve
 
 import ru.fomenkov.plugin.resolver.GradleCacheItem
 import ru.fomenkov.plugin.resolver.ProjectResolver
+import ru.fomenkov.plugin.task.Task
 import ru.fomenkov.plugin.util.*
 import ru.fomenkov.runner.CLASSPATH_DIR
 import ru.fomenkov.runner.SOURCE_FILES_DIR
@@ -9,14 +10,14 @@ import java.io.File
 import java.util.concurrent.Callable
 import java.util.concurrent.Executors
 
-class ProjectResolveTask(private val input: ProjectResolverInput) {
+class ProjectResolveTask(private val input: ProjectResolverInput) : Task<ProjectResolverOutput> {
 
     private val resolver = ProjectResolver(
         propertiesFileName = input.propertiesFileName,
         settingsFileName = input.settingsFileName,
     )
 
-    fun run(): ProjectResolverOutput {
+    override fun run(): ProjectResolverOutput {
         val moduleDeclarations = resolver.parseModuleDeclarations()
         val modulePathsMap = moduleDeclarations.associate { dec -> dec.name to dec.path }
         val srcFiles = exec("find ${input.greencatRoot}/$SOURCE_FILES_DIR").filter(::isFileSupported)
