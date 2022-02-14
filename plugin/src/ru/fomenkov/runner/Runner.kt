@@ -9,16 +9,23 @@ import ru.fomenkov.runner.params.RunnerParams
 import ru.fomenkov.runner.ssh.setRemoteHost
 import ru.fomenkov.runner.ssh.ssh
 import java.io.File
-import kotlin.random.Random
+import java.util.concurrent.TimeUnit
+import kotlin.math.abs
 
-fun main(args: Array<String>) = try {
-    val time = timeMillis { launch(args) }
-    displayTotalTime(time)
+private var displayTotalTime = true
 
-} catch (error: Throwable) {
-    when (error.message.isNullOrBlank()) {
-        true -> Log.e("Process execution failed")
-        else -> Log.e("Process execution failed. ${error.message}")
+fun main(args: Array<String>) {
+    try {
+        val time = timeMillis { launch(args) }
+
+        if (displayTotalTime) {
+            displayTotalTime(time)
+        }
+    } catch (error: Throwable) {
+        when (error.message.isNullOrBlank()) {
+            true -> Log.e("Process execution failed")
+            else -> Log.e("Process execution failed. ${error.message}")
+        }
     }
 }
 
@@ -30,12 +37,17 @@ private fun launch(args: Array<String>) {
     val params = readParams(args) ?: return
     setRemoteHost(host = params.sshHost)
 
-    val supported = checkGitDiff() ?: return
-    syncWithMainframer(params, supported)
-    checkForUpdate(params)
-    startGreenCatPlugin(params)
-    pushDexToAndroidDevice(params)
-    restartApplication(params)
+    if (params.mode == RunnerMode.Update) {
+        checkForUpdate(params, forceCheck = true)
+        displayTotalTime = false
+    } else {
+        val supported = checkGitDiff() ?: return
+        syncWithMainframer(params, supported)
+        checkForUpdate(params, forceCheck = false)
+        startGreenCatPlugin(params)
+        pushDexToAndroidDevice(params)
+        restartApplication(params)
+    }
 }
 
 private fun restartApplication(params: RunnerParams) {
@@ -54,6 +66,7 @@ private fun restartApplication(params: RunnerParams) {
             Log.d("Starting UI test...")
             // TODO: implement
         }
+        else -> error("Unexpected runner mode: ${params.mode}")
     }
 }
 
@@ -133,10 +146,31 @@ private fun formatMappedModulesParameter(mappedModules: Map<String, String>) =
     }
 
 private fun isNeedToCheckVersion(): Boolean {
-    return Random.nextInt(from = 1, until = 5) == 3 // TODO: store timestamp
+    val tmpDir = exec("echo \$TMPDIR").firstOrNull() ?: ""
+    check(tmpDir.isNotBlank()) { "Failed to get /tmp directory" }
+    val updateFile = File("$tmpDir/$UPDATE_TIMESTAMP_FILE")
+
+    fun writeTimestamp() {
+        val timestampNow = System.currentTimeMillis()
+        updateFile.writeText(timestampNow.toString())
+    }
+    return if (updateFile.exists()) {
+        val timestampLastUpdate = updateFile.readText().toLong()
+        val timestampNow = System.currentTimeMillis()
+
+        if (abs(timestampNow - timestampLastUpdate) > CHECK_UPDATE_INTERVAL) {
+            writeTimestamp()
+            true
+        } else {
+            false
+        }
+    } else {
+        writeTimestamp()
+        true
+    }
 }
 
-private fun checkForUpdate(params: RunnerParams) {
+private fun checkForUpdate(params: RunnerParams, forceCheck: Boolean) {
     val remoteJarPath = "${params.greencatRoot}/$GREENCAT_JAR"
     val exists = ssh { cmd("ls $remoteJarPath && echo OK") }.find { line -> line.trim() == "OK" } != null
 
@@ -179,7 +213,9 @@ private fun checkForUpdate(params: RunnerParams) {
         }
     }
     if (exists) {
-        if (isNeedToCheckVersion()) {
+        if (forceCheck || isNeedToCheckVersion()) {
+            Log.d("Checking for update...")
+
             val curVersion = ssh { cmd("java -jar $remoteJarPath -v") }.firstOrNull()?.trim() ?: ""
             val (updVersion, artifactUrl) = getVersionInfo()
 
@@ -245,13 +281,16 @@ private fun validateShellCommands() {
     }
 }
 
-private const val PROJECT_GITHUB = "https://github.com/andreyfomenkov/green-cat"
-private const val GREENCAT_JAR = "greencat.jar"
+const val PROJECT_GITHUB = "https://github.com/andreyfomenkov/green-cat"
+const val GREENCAT_JAR = "greencat.jar"
 const val CLASSPATH_DIR = "cp"
 const val SOURCE_FILES_DIR = "src"
 const val CLASS_FILES_DIR = "class"
 const val DEX_FILES_DIR = "dex"
 const val OUTPUT_DEX_FILE = "delta.dex"
 const val DEVICE_DEX_DIR = "/sdcard/greencat"
+const val UPDATE_TIMESTAMP_FILE = "greencat_update"
+val CHECK_UPDATE_INTERVAL = TimeUnit.HOURS.toMillis(1)
+
 // TODO: change URL with the branch name (master-v2 -> master)
-private const val ARTIFACT_VERSION_INFO_URL = "https://raw.githubusercontent.com/andreyfomenkov/green-cat/master-v2/artifacts/version-info"
+const val ARTIFACT_VERSION_INFO_URL = "https://raw.githubusercontent.com/andreyfomenkov/green-cat/master-v2/artifacts/version-info"

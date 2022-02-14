@@ -21,24 +21,35 @@ class ParamsReader(
             check(value.isNotBlank()) { "Empty value for parameter ${param.key}" }
             paramsMap += param to value
         }
-        val mode = when (val name = value(Param.RUNNER_MODE)) {
-            Mode.DEBUG.mode -> RunnerMode.Debug(
-                componentName = value(Param.COMPONENT_NAME),
+        return if (paramsMap.containsKey(Param.RUNNER_MODE)) {
+            val mode = when (val name = value(Param.RUNNER_MODE)) {
+                Mode.DEBUG.mode -> RunnerMode.Debug(
+                    componentName = value(Param.COMPONENT_NAME),
+                )
+                Mode.UITEST.mode -> RunnerMode.UiTest(
+                    testClass = value(Param.TEST_CLASS),
+                    testRunner = value(Param.TEST_RUNNER),
+                )
+                else -> error("Unknown runner mode: $name")
+            }
+            RunnerParams(
+                sshHost = value(Param.SSH_HOST),
+                projectRoot = value(Param.PROJECT_ROOT),
+                androidSdkRoot = value(Param.ANDROID_SDK_ROOT),
+                greencatRoot = value(Param.GREENCAT_ROOT),
+                mode = mode,
+                modulesMap = splitToMappedModules(paramsMap[Param.MAPPED_MODULES]),
             )
-            Mode.UITEST.mode -> RunnerMode.UiTest(
-                testClass = value(Param.TEST_CLASS),
-                testRunner = value(Param.TEST_RUNNER),
+        } else {
+            RunnerParams(
+                sshHost = value(Param.SSH_HOST),
+                projectRoot = "",
+                androidSdkRoot = "",
+                greencatRoot = value(Param.GREENCAT_ROOT),
+                mode = RunnerMode.Update,
+                modulesMap = emptyMap(),
             )
-            else -> error("Unknown runner mode: $name")
         }
-        return RunnerParams(
-            sshHost = value(Param.SSH_HOST),
-            projectRoot = value(Param.PROJECT_ROOT),
-            androidSdkRoot = value(Param.ANDROID_SDK_ROOT),
-            greencatRoot = value(Param.GREENCAT_ROOT),
-            mode = mode,
-            modulesMap = splitToMappedModules(paramsMap[Param.MAPPED_MODULES]),
-        )
     }
 
     private fun splitToMappedModules(value: String?) = when (value.isNullOrBlank()) {

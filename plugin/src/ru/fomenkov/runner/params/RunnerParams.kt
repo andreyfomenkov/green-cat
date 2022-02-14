@@ -19,6 +19,8 @@ sealed class RunnerMode {
         val testClass: String,
         val testRunner: String,
     ) : RunnerMode()
+
+    object Update : RunnerMode()
 }
 
 enum class Param(
@@ -33,7 +35,8 @@ enum class Param(
     COMPONENT_NAME(key = "-c", description = "Component name for main activity in 'debug' mode"),
     TEST_CLASS(key = "-t", description = "Espresso test canonical class name in 'uitest' mode"),
     TEST_RUNNER(key = "-r", description = "Espresso test runner in 'uitest' mode"),
-    MAPPED_MODULES(key = "-a", description = "Mapped modules, ':' splitted, comma separated")
+    MAPPED_MODULES(key = "-a", description = "Mapped modules, ':' splitted, comma separated"),
+    UPDATE(key = "-u", description = "Check for update")
 }
 
 enum class Mode(val mode: String) {
