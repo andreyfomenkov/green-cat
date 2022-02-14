@@ -8,9 +8,12 @@ import ru.fomenkov.runner.CLASSPATH_DIR
 import ru.fomenkov.runner.SOURCE_FILES_DIR
 import java.io.File
 import java.util.concurrent.Callable
-import java.util.concurrent.Executors
+import java.util.concurrent.ExecutorService
 
-class ProjectResolveTask(private val input: ProjectResolverInput) : Task<ProjectResolverOutput> {
+class ProjectResolveTask(
+    private val input: ProjectResolverInput,
+    private val executor: ExecutorService,
+) : Task<ProjectResolverOutput> {
 
     private val resolver = ProjectResolver(
         propertiesFileName = input.propertiesFileName,
@@ -58,7 +61,7 @@ class ProjectResolveTask(private val input: ProjectResolverInput) : Task<Project
             generateClasspathFilesForModules(absentCpFiles, modulePathsMap)
         }
         val moduleClasspathMap = mutableMapOf<String, String>()
-        val moduleCompilationOrderMap = mutableMapOf<String, Int>()
+        val moduleChildren = mutableMapOf<String, Set<String>>()
 
         srcModuleGroups.keys.forEach { moduleName ->
             val cpFilePath = "${input.greencatRoot}/$CLASSPATH_DIR/$moduleName".noTilda()
@@ -67,10 +70,16 @@ class ProjectResolveTask(private val input: ProjectResolverInput) : Task<Project
             if (!cpFile.exists()) {
                 error("Classpath file doesn't exist: $cpFilePath")
             }
-            moduleClasspathMap += moduleName to cpFile.readText()
+            val (classpath, children) = cpFile.readLines()
+            moduleClasspathMap += moduleName to classpath
+            moduleChildren += moduleName to children.split(":").toSet()
         }
-        // TODO: determine modules' compilation order
+        val moduleCompilationOrderMap = CompilationOrderResolver().getModulesCompilationOrder(moduleChildren)
+        check(srcModuleGroups.size == moduleCompilationOrderMap.size) { "Missing some modules" }
 
+        moduleCompilationOrderMap.keys.forEach { moduleName ->
+            checkNotNull(modulePathsMap[moduleName]) { "Module not found: $moduleName" }
+        }
         return ProjectResolverOutput(
             sourceFilesMap = srcModuleGroups,
             moduleClasspathMap = moduleClasspathMap,
@@ -85,7 +94,6 @@ class ProjectResolveTask(private val input: ProjectResolverInput) : Task<Project
         Telemetry.log("No classpath files for the next module(s): " + moduleNames.joinToString(separator = ", "))
         Telemetry.log("Building dependency tree. It may take a while...")
 
-        val executor = Executors.newFixedThreadPool(4)
         val supportResFuture = executor.submit(
             Callable { resolver.findAllResourcesInGradleCache(SUPPORT_RESOURCES_CACHE_PATH) }
         )
@@ -112,9 +120,13 @@ class ProjectResolveTask(private val input: ProjectResolverInput) : Task<Project
                 error("Failed to generate classpath file")
             }
         }
-        executor.shutdown()
     }
 
+    /**
+     * Classpath file:
+     * Line 1: module classpath separated with ":"
+     * Line 2: child modules, including transitive, separated with ":"
+     */
     private fun generateClasspathFile(
         moduleName: String,
         moduleNameToPathMap: Map<String, String>,
@@ -138,7 +150,9 @@ class ProjectResolveTask(private val input: ProjectResolverInput) : Task<Project
             }
             return -1
         }
-        if (!isGradleRunSuccessful(output)) {
+        if (isGradleRunSuccessful(output)) {
+            Telemetry.log("Gradle dependency tree generated for module $moduleName")
+        } else {
             Telemetry.err("Failed to generate Gradle dependency tree")
             output.takeLast(50).forEach { line -> Telemetry.err("[Gradle] $line") }
             return false
@@ -160,7 +174,7 @@ class ProjectResolveTask(private val input: ProjectResolverInput) : Task<Project
             }
             graph += output[i]
         }
-        val classpath = getModuleClasspath(
+        val (classpath, children) = getModuleClasspath(
             moduleName = moduleName,
             androidSdkPath = input.androidSdkPath,
             graph = graph,
@@ -168,8 +182,11 @@ class ProjectResolveTask(private val input: ProjectResolverInput) : Task<Project
             supportCacheResources = supportCacheResources,
             jetifiedResources = jetifiedResources,
         )
-        val cpFile = File("${input.greencatRoot}/$CLASSPATH_DIR/$moduleName".noTilda())
-        cpFile.writeText(classpath.joinToString(separator = ":"))
+        val content = StringBuilder().apply {
+            append("${classpath.joinToString(separator = ":")}\n") // Line 1: module classpath
+            append(children.joinToString(separator = ":"))         // Line 2: child modules
+        }
+        File("${input.greencatRoot}/$CLASSPATH_DIR/$moduleName".noTilda()).writeText(content.toString())
         return true
     }
 
@@ -185,6 +202,9 @@ class ProjectResolveTask(private val input: ProjectResolverInput) : Task<Project
         return mappedName ?: sourceName
     }
 
+    /**
+     * @return module classpath and child modules including transitive
+     */
     private fun getModuleClasspath(
         moduleName: String,
         androidSdkPath: String,
@@ -192,7 +212,7 @@ class ProjectResolveTask(private val input: ProjectResolverInput) : Task<Project
         moduleNameToPathMap: Map<String, String>,
         supportCacheResources: Set<GradleCacheItem>,
         jetifiedResources: Map<String, Set<String>>,
-    ): Set<String> {
+    ): Pair<Set<String>, Set<String>> {
         val projects = mutableSetOf<String>()
         val libs = mutableSetOf<Pair<String, String>>()
         val resolveProject = { line: String -> // TODO: refactor
@@ -340,7 +360,7 @@ class ProjectResolveTask(private val input: ProjectResolverInput) : Task<Project
                 val file = File(path)
                 file.isDirectory && file.list().isNullOrEmpty()
             }
-            .toSet()
+            .toSet() to projects
     }
 
     private fun checkPathExists(path: String) = check(File(path).exists()) { "Path doesn't exist: $path" }

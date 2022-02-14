@@ -9,25 +9,52 @@ import ru.fomenkov.runner.CLASS_FILES_DIR
 import ru.fomenkov.runner.DEX_FILES_DIR
 import ru.fomenkov.runner.OUTPUT_DEX_FILE
 import java.io.File
+import java.util.concurrent.Callable
+import java.util.concurrent.ExecutorService
 
 class CompileTask(
     private val greencatRoot: String,
     private val androidSdkRoot: String,
     private val projectInfo: ProjectResolverOutput,
+    private val executor: ExecutorService,
 ) : Task<Unit> {
 
     override fun run() {
         clearDirectory(CLASS_FILES_DIR)
         clearDirectory(DEX_FILES_DIR)
+        val orderMap = mutableMapOf<Int, MutableSet<String>>()
 
-        projectInfo.sourceFilesMap.forEach { (moduleName, srcFiles) ->
-            val classpath = projectInfo.moduleClasspathMap[moduleName]
-            checkNotNull(classpath) { "No classpath for module: $moduleName" }
-            val result = compileWithJavac(srcFiles, moduleName, classpath)
+        projectInfo.moduleCompilationOrderMap.forEach { (moduleName: String, order: Int) ->
+            val modules = orderMap[order] ?: mutableSetOf()
+            modules += moduleName
+            orderMap[order] = modules
+        }
+        orderMap.keys.sorted().forEach { order ->
+            val modules = checkNotNull(orderMap[order]) {
+                "No modules for compilation order $order"
+            }
+            Telemetry.log("Compilation round ${order + 1} of ${orderMap.size}: ${modules.joinToString(separator = ", ")}")
 
-            if (result is CompilationResult.Error) {
-                result.output.forEach { line -> Telemetry.err("[JAVAC] $line") }
-                error("Failed to compile module ${result.moduleName}")
+            val tasks = modules.map { moduleName ->
+                val srcFiles = checkNotNull(projectInfo.sourceFilesMap[moduleName]) {
+                    "No source files for module $moduleName"
+                }
+                val classpath = checkNotNull(projectInfo.moduleClasspathMap[moduleName]) {
+                    "No classpath for module $moduleName"
+                }
+                executor.submit(
+                    Callable {
+                        compileWithJavac(srcFiles = srcFiles, moduleName = moduleName, moduleClasspath = classpath)
+                    }
+                )
+            }
+            tasks.forEach { task ->
+                val result = task.get()
+
+                if (result is CompilationResult.Error) {
+                    result.output.forEach { line -> Telemetry.err("[JAVAC] $line") }
+                    error("Failed to compile module ${result.moduleName}")
+                }
             }
         }
         runD8()
