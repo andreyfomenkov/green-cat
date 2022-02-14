@@ -4,6 +4,7 @@ import ru.fomenkov.plugin.util.*
 import ru.fomenkov.runner.diff.GitDiffParser
 import ru.fomenkov.runner.logger.Log
 import ru.fomenkov.runner.params.ParamsReader
+import ru.fomenkov.runner.params.RunnerMode
 import ru.fomenkov.runner.params.RunnerParams
 import ru.fomenkov.runner.ssh.setRemoteHost
 import ru.fomenkov.runner.ssh.ssh
@@ -33,10 +34,44 @@ private fun launch(args: Array<String>) {
     syncWithMainframer(params, supported)
     checkForUpdate(params)
     startGreenCatPlugin(params)
+    pushDexToAndroidDevice(params)
+    restartApplication(params)
+}
+
+private fun restartApplication(params: RunnerParams) {
+    when (params.mode) {
+        is RunnerMode.Debug -> {
+            Log.d("Restarting application...")
+
+            val action = "android.intent.action.MAIN"
+            val category = "android.intent.category.LAUNCHER"
+            val componentName = params.mode.componentName
+            val appPackage = componentName.split("/").first()
+            exec("adb shell am force-stop $appPackage")
+            exec("adb shell am start -n $componentName -a $action -c $category")
+        }
+        is RunnerMode.UiTest -> {
+            Log.d("Starting UI test...")
+            // TODO: implement
+        }
+    }
+}
+
+private fun pushDexToAndroidDevice(params: RunnerParams) {
+    val tmpDir = exec("echo \$TMPDIR").firstOrNull() ?: ""
+    check(tmpDir.isNotBlank()) { "Failed to get /tmp directory" }
+
+    exec("scp ${params.sshHost}:${params.greencatRoot}/$DEX_FILES_DIR/$OUTPUT_DEX_FILE $tmpDir")
+    val output = exec("adb push $tmpDir/$OUTPUT_DEX_FILE $DEVICE_DEX_DIR/$OUTPUT_DEX_FILE")
+
+    if (output.find { line -> line.contains("error:") } != null) {
+        output.forEach(Telemetry::err)
+        error("Failed to push DEX file via adb")
+    }
 }
 
 private fun displayTotalTime(time: Long) {
-    val str = "│  Deployed in ${formatMillis(time)}  │"
+    val str = "│  Build & deploy complete in ${formatMillis(time)}  │"
     val border = "─".repeat(str.length - 2)
     val space = " ".repeat(str.length - 2)
 
@@ -217,5 +252,6 @@ const val SOURCE_FILES_DIR = "src"
 const val CLASS_FILES_DIR = "class"
 const val DEX_FILES_DIR = "dex"
 const val OUTPUT_DEX_FILE = "delta.dex"
+const val DEVICE_DEX_DIR = "/sdcard/greencat"
 // TODO: change URL with the branch name (master-v2 -> master)
 private const val ARTIFACT_VERSION_INFO_URL = "https://raw.githubusercontent.com/andreyfomenkov/green-cat/master-v2/artifacts/version-info"
