@@ -16,6 +16,7 @@ sealed class RunnerMode {
     ) : RunnerMode()
 
     data class UiTest(
+        val appPackage: String,
         val testClass: String,
         val testRunner: String,
     ) : RunnerMode()
@@ -32,9 +33,13 @@ enum class Param(
     ANDROID_SDK_ROOT(key = "-s", description = "Android SDK root directory on the remote host"),
     GREENCAT_ROOT(key = "-g", description = "GreenCat root directory on the remote host"),
     RUNNER_MODE(key = "-m", description = "Runner mode (debug or uitest)"),
+    // Debug runner mode
     COMPONENT_NAME(key = "-c", description = "Component name for main activity in 'debug' mode"),
+    // UI test runner mode
+    APP_PACKAGE(key = "-n", description = "Application package"),
     TEST_CLASS(key = "-t", description = "Espresso test canonical class name in 'uitest' mode"),
     TEST_RUNNER(key = "-r", description = "Espresso test runner in 'uitest' mode"),
+
     MAPPED_MODULES(key = "-a", description = "Mapped modules, ':' splitted, comma separated"),
     UPDATE(key = "-u", description = "Check for update")
 }

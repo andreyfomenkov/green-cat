@@ -27,6 +27,7 @@ class ParamsReader(
                     componentName = value(Param.COMPONENT_NAME),
                 )
                 Mode.UITEST.mode -> RunnerMode.UiTest(
+                    appPackage = value(Param.APP_PACKAGE),
                     testClass = value(Param.TEST_CLASS),
                     testRunner = value(Param.TEST_RUNNER),
                 )

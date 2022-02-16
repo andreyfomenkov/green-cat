@@ -12,15 +12,18 @@ import java.io.File
 import java.util.concurrent.TimeUnit
 import kotlin.math.abs
 
-private var displayTotalTime = true
+private var displayTotalTime = false
 
 fun main(args: Array<String>) {
     try {
-        val time = timeMillis { launch(args) }
+        var params: RunnerParams? = null
+        val time = timeMillis { params = launch(args) }
 
         if (displayTotalTime) {
             displayTotalTime(time)
         }
+        params?.apply(::restartApplication)
+
     } catch (error: Throwable) {
         when (error.message.isNullOrBlank()) {
             true -> Log.e("Process execution failed")
@@ -29,31 +32,32 @@ fun main(args: Array<String>) {
     }
 }
 
-private fun launch(args: Array<String>) {
+private fun launch(args: Array<String>): RunnerParams? {
     Log.d("Starting GreenCat Runner")
     Log.d("Project on GitHub: $PROJECT_GITHUB\n")
     validateShellCommands()
 
-    val params = readParams(args) ?: return
+    val params = readParams(args) ?: return null
     setRemoteHost(host = params.sshHost)
 
     if (params.mode == RunnerMode.Update) {
         checkForUpdate(params, forceCheck = true)
-        displayTotalTime = false
+        return null
     } else {
-        val supported = checkGitDiff() ?: return
+        val supported = checkGitDiff() ?: return null
         syncWithMainframer(params, supported)
         checkForUpdate(params, forceCheck = false)
         startGreenCatPlugin(params)
         pushDexToAndroidDevice(params)
-        restartApplication(params)
+        displayTotalTime = true
+        return params
     }
 }
 
 private fun restartApplication(params: RunnerParams) {
     when (params.mode) {
         is RunnerMode.Debug -> {
-            Log.d("Restarting application...")
+            Log.d("\nRestarting application...")
 
             val action = "android.intent.action.MAIN"
             val category = "android.intent.category.LAUNCHER"
@@ -63,19 +67,30 @@ private fun restartApplication(params: RunnerParams) {
             exec("adb shell am start -n $componentName -a $action -c $category")
         }
         is RunnerMode.UiTest -> {
-            Log.d("Starting UI test...")
-            // TODO: implement
+            val testClass = params.mode.testClass
+            val testRunner = params.mode.testRunner
+            Log.d("\nLaunching UI test $testClass...") // TODO: start after
+
+            val output = exec("adb shell am instrument -w -m -e debug false -e class '$testClass' $testRunner")
+            output.forEach(Telemetry::log)
         }
-        else -> error("Unexpected runner mode: ${params.mode}")
+        else -> {
+            // NOP
+        }
     }
 }
 
 private fun pushDexToAndroidDevice(params: RunnerParams) {
+    val appPackage = when (params.mode) {
+        is RunnerMode.Debug -> params.mode.componentName.split("/").first()
+        is RunnerMode.UiTest -> params.mode.appPackage
+        else -> error("Unexpected runner mode: ${params.mode.javaClass.simpleName}")
+    }
     val tmpDir = exec("echo \$TMPDIR").firstOrNull() ?: ""
     check(tmpDir.isNotBlank()) { "Failed to get /tmp directory" }
 
     exec("scp ${params.sshHost}:${params.greencatRoot}/$DEX_FILES_DIR/$OUTPUT_DEX_FILE $tmpDir")
-    val output = exec("adb push $tmpDir/$OUTPUT_DEX_FILE $DEVICE_DEX_DIR/$OUTPUT_DEX_FILE")
+    val output = exec("adb push $tmpDir/$OUTPUT_DEX_FILE /sdcard/Android/data/$appPackage/files/$OUTPUT_DEX_FILE")
 
     if (output.find { line -> line.contains("error:") } != null) {
         output.forEach(Telemetry::err)
@@ -282,15 +297,12 @@ private fun validateShellCommands() {
 }
 
 const val PROJECT_GITHUB = "https://github.com/andreyfomenkov/green-cat"
+const val ARTIFACT_VERSION_INFO_URL = "https://raw.githubusercontent.com/andreyfomenkov/green-cat/master/artifacts/version-info"
 const val GREENCAT_JAR = "greencat.jar"
 const val CLASSPATH_DIR = "cp"
 const val SOURCE_FILES_DIR = "src"
 const val CLASS_FILES_DIR = "class"
 const val DEX_FILES_DIR = "dex"
-const val OUTPUT_DEX_FILE = "delta.dex"
-const val DEVICE_DEX_DIR = "/sdcard/greencat"
+const val OUTPUT_DEX_FILE = "patch.dex"
 const val UPDATE_TIMESTAMP_FILE = "greencat_update"
 val CHECK_UPDATE_INTERVAL = TimeUnit.HOURS.toMillis(1)
-
-// TODO: change URL with the branch name (master-v2 -> master)
-const val ARTIFACT_VERSION_INFO_URL = "https://raw.githubusercontent.com/andreyfomenkov/green-cat/master-v2/artifacts/version-info"
