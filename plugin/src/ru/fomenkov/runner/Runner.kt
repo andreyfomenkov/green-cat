@@ -69,7 +69,7 @@ private fun restartApplication(params: RunnerParams) {
         is RunnerMode.UiTest -> {
             val testClass = params.mode.testClass
             val testRunner = params.mode.testRunner
-            Log.d("\nLaunching UI test $testClass...") // TODO: start after
+            Log.d("\nLaunching UI test $testClass...")
 
             val output = exec("adb shell am instrument -w -m -e debug false -e class '$testClass' $testRunner")
             output.forEach(Telemetry::log)
