@@ -81,16 +81,11 @@ private fun restartApplication(params: RunnerParams) {
 }
 
 private fun pushDexToAndroidDevice(params: RunnerParams) {
-    val appPackage = when (params.mode) {
-        is RunnerMode.Debug -> params.mode.componentName.split("/").first()
-        is RunnerMode.UiTest -> params.mode.appPackage
-        else -> error("Unexpected runner mode: ${params.mode.javaClass.simpleName}")
-    }
     val tmpDir = exec("echo \$TMPDIR").firstOrNull() ?: ""
     check(tmpDir.isNotBlank()) { "Failed to get /tmp directory" }
 
     exec("scp ${params.sshHost}:${params.greencatRoot}/$DEX_FILES_DIR/$OUTPUT_DEX_FILE $tmpDir")
-    val output = exec("adb push $tmpDir/$OUTPUT_DEX_FILE /sdcard/Android/data/$appPackage/files/$OUTPUT_DEX_FILE")
+    val output = exec("adb push $tmpDir/$OUTPUT_DEX_FILE $ANDROID_DEVICE_DEX_DIR/$OUTPUT_DEX_FILE")
 
     if (output.find { line -> line.contains("error:") } != null) {
         output.forEach(Telemetry::err)
@@ -188,6 +183,7 @@ private fun isNeedToCheckVersion(): Boolean {
 private fun checkForUpdate(params: RunnerParams, forceCheck: Boolean) {
     val remoteJarPath = "${params.greencatRoot}/$GREENCAT_JAR"
     val exists = ssh { cmd("ls $remoteJarPath && echo OK") }.find { line -> line.trim() == "OK" } != null
+    ssh { cmd("mkdir -p ${params.greencatRoot}") }
 
     fun getVersionInfo(): Pair<String, String> {
         val lines = exec("curl -s $ARTIFACT_VERSION_INFO_URL")
@@ -255,6 +251,7 @@ private fun syncWithMainframer(
     ssh {
         cmd("mkdir -p ${params.greencatRoot}")
         cmd("cd ${params.greencatRoot}")
+        cmd("mkdir $CLASSPATH_DIR")
         cmd("rm -rf $SOURCE_FILES_DIR; mkdir $SOURCE_FILES_DIR")
         cmd("rm -rf $CLASS_FILES_DIR; mkdir $CLASS_FILES_DIR")
         cmd("rm -rf $DEX_FILES_DIR; mkdir $DEX_FILES_DIR")
@@ -303,6 +300,7 @@ const val CLASSPATH_DIR = "cp"
 const val SOURCE_FILES_DIR = "src"
 const val CLASS_FILES_DIR = "class"
 const val DEX_FILES_DIR = "dex"
+const val ANDROID_DEVICE_DEX_DIR = "/data/local/tmp"
 const val OUTPUT_DEX_FILE = "patch.dex"
 const val UPDATE_TIMESTAMP_FILE = "greencat_update"
 val CHECK_UPDATE_INTERVAL = TimeUnit.HOURS.toMillis(1)

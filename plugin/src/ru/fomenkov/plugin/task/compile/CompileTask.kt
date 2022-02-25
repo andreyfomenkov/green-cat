@@ -5,6 +5,7 @@ import ru.fomenkov.plugin.task.resolve.ProjectResolverOutput
 import ru.fomenkov.plugin.util.Telemetry
 import ru.fomenkov.plugin.util.exec
 import ru.fomenkov.plugin.util.noTilda
+import ru.fomenkov.runner.CLASSPATH_DIR
 import ru.fomenkov.runner.CLASS_FILES_DIR
 import ru.fomenkov.runner.DEX_FILES_DIR
 import ru.fomenkov.runner.OUTPUT_DEX_FILE
@@ -53,11 +54,17 @@ class CompileTask(
 
                 if (result is CompilationResult.Error) {
                     result.output.forEach { line -> Telemetry.err("[JAVAC] $line") }
+                    deleteClasspathForModule(result.moduleName)
                     error("Failed to compile module ${result.moduleName}")
                 }
             }
         }
         runD8()
+    }
+
+    private fun deleteClasspathForModule(moduleName: String) {
+        Telemetry.log("Delete classpath file for module $moduleName")
+        File("$greencatRoot/$CLASSPATH_DIR/$moduleName").delete()
     }
 
     private fun compileWithJavac(srcFiles: Set<String>, moduleName: String, moduleClasspath: String): CompilationResult {
