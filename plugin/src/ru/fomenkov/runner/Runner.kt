@@ -57,7 +57,7 @@ private fun launch(args: Array<String>): RunnerParams? {
 private fun restartApplication(params: RunnerParams) {
     when (params.mode) {
         is RunnerMode.Debug -> {
-            Log.d("\nRestarting application...")
+            Log.d("\nRestarting application on the Android device...")
 
             val action = "android.intent.action.MAIN"
             val category = "android.intent.category.LAUNCHER"
@@ -109,14 +109,13 @@ private fun displayTotalTime(time: Long) {
 private fun startGreenCatPlugin(params: RunnerParams) {
     val greencatJar = "${params.greencatRoot}/$GREENCAT_JAR"
     val version = ssh { cmd("java -jar $greencatJar -v") }.firstOrNull() ?: "???"
-    Log.d("Launching GreenCat v$version on the remote host")
+    Log.d("Launching GreenCat v$version on the remote host. It may take a while...")
 
     val mappedModulesParam = formatMappedModulesParameter(params.modulesMap)
-    val output = ssh(print = true) {
+    ssh(print = true) {
         cmd("cd ${params.projectRoot}")
         cmd("java -jar $greencatJar -s ${params.androidSdkRoot} -g ${params.greencatRoot} $mappedModulesParam")
     }
-    output.forEach(Log::d)
 }
 
 private fun checkGitDiff(): List<String>? {
@@ -132,7 +131,7 @@ private fun checkGitDiff(): List<String>? {
     }
     if (supported.isNotEmpty()) {
         Log.d("\nSource file(s) to be compiled:\n")
-        supported.sorted().forEach { path -> Log.d(" [*] $path") }
+        supported.sorted().forEach { path -> Log.d(" [+] $path") }
     }
     if (ignored.isNotEmpty()) {
         Log.d("\nIgnored (not supported):\n")
@@ -300,6 +299,7 @@ const val CLASSPATH_DIR = "cp"
 const val SOURCE_FILES_DIR = "src"
 const val CLASS_FILES_DIR = "class"
 const val DEX_FILES_DIR = "dex"
+const val KOTLINC_RELAXED_DIR = "kotlinc-relaxed"
 const val ANDROID_DEVICE_DEX_DIR = "/data/local/tmp"
 const val OUTPUT_DEX_FILE = "patch.dex"
 const val UPDATE_TIMESTAMP_FILE = "greencat_update"

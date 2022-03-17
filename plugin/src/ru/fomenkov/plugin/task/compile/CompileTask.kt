@@ -5,13 +5,9 @@ import ru.fomenkov.plugin.task.resolve.ProjectResolverOutput
 import ru.fomenkov.plugin.util.Telemetry
 import ru.fomenkov.plugin.util.exec
 import ru.fomenkov.plugin.util.noTilda
-import ru.fomenkov.runner.CLASSPATH_DIR
-import ru.fomenkov.runner.CLASS_FILES_DIR
-import ru.fomenkov.runner.DEX_FILES_DIR
-import ru.fomenkov.runner.OUTPUT_DEX_FILE
+import ru.fomenkov.runner.*
 import java.io.File
-import java.util.concurrent.Callable
-import java.util.concurrent.ExecutorService
+import java.util.concurrent.*
 
 class CompileTask(
     private val greencatRoot: String,
@@ -43,17 +39,29 @@ class CompileTask(
                 val classpath = checkNotNull(projectInfo.moduleClasspathMap[moduleName]) {
                     "No classpath for module $moduleName"
                 }
-                executor.submit(
-                    Callable {
-                        compileWithJavac(srcFiles = srcFiles, moduleName = moduleName, moduleClasspath = classpath)
+                val javaSrcFiles = srcFiles.filter { path -> path.endsWith(".java") }.toSet()
+                val kotlinSrcFiles = srcFiles.filter { path -> path.endsWith(".kt") }.toSet()
+
+                Callable {
+                    val result = when (javaSrcFiles.isEmpty()) {
+                        true -> CompilationResult.Successful
+                        else -> compileWithJavac(srcFiles = javaSrcFiles, moduleName = moduleName, moduleClasspath = classpath)
                     }
-                )
+                    if (result is CompilationResult.Error) {
+                        result
+                    } else {
+                        when (kotlinSrcFiles.isEmpty()) {
+                            true -> CompilationResult.Successful
+                            else -> compileWithKotlin(srcFiles = kotlinSrcFiles, moduleName = moduleName, moduleClasspath = classpath)
+                        }
+                    }
+                }.run { executor.submit(this) }
             }
             tasks.forEach { task ->
                 val result = task.get()
 
                 if (result is CompilationResult.Error) {
-                    result.output.forEach { line -> Telemetry.err("[JAVAC] $line") }
+                    result.output.forEach { line -> Telemetry.err(line) }
                     deleteClasspathForModule(result.moduleName)
                     error("Failed to compile module ${result.moduleName}")
                 }
@@ -79,6 +87,29 @@ class CompileTask(
             else -> CompilationResult.Error(moduleName, lines)
         }
     }
+
+    private fun compileWithKotlin(srcFiles: Set<String>, moduleName: String, moduleClasspath: String): CompilationResult {
+        val kotlinc = "$greencatRoot/$KOTLINC_RELAXED_DIR/bin/kotlinc".noTilda()
+
+        if (!File(kotlinc).exists()) {
+            error("Kotlin compiler not found: $kotlinc")
+        }
+        val classDir = "$greencatRoot/$CLASS_FILES_DIR".noTilda()
+        val srcFilesLine = srcFiles.joinToString(separator = " ")
+        val friendPaths = getFriendModulePaths(moduleName, moduleClasspath).joinToString(separator = ",")
+        val cmd = "$kotlinc -Xjvm-default=all-compatibility -Xfriend-paths=$friendPaths -d $classDir -classpath $moduleClasspath $srcFilesLine"
+        val lines = exec(cmd)
+        val inputFileNames = srcFiles.map { path -> File(path).nameWithoutExtension }.toSet()
+        val outputFileNames = exec("find $classDir -name '*.class'").map { path -> File(path).nameWithoutExtension }.toSet()
+
+        return when ((inputFileNames - outputFileNames).isEmpty()) {
+            true -> CompilationResult.Successful
+            else -> CompilationResult.Error(moduleName, lines)
+        }
+    }
+
+    private fun getFriendModulePaths(moduleName: String, moduleClasspath: String) =
+        moduleClasspath.split(":").filter { path -> path.contains("$moduleName/build") }
 
     private fun runD8() {
         val standardDexFileName = "classes.dex"

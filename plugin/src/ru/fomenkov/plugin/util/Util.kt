@@ -29,4 +29,4 @@ fun timeMillis(action: () -> Unit): Long {
     return end - start
 }
 
-fun isFileSupported(path: String) = path.trim().endsWith(".java")
+fun isFileSupported(path: String) = path.trim().endsWith(".java") || path.trim().endsWith(".kt")
