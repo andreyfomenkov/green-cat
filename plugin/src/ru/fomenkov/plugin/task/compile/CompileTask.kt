@@ -89,7 +89,7 @@ class CompileTask(
     }
 
     private fun compileWithKotlin(srcFiles: Set<String>, moduleName: String, moduleClasspath: String): CompilationResult {
-        val kotlinc = "$greencatRoot/$KOTLINC_RELAXED_DIR/bin/kotlinc".noTilda()
+        val kotlinc = "$greencatRoot/$KOTLINC_DIR/bin/kotlinc".noTilda()
 
         if (!File(kotlinc).exists()) {
             error("Kotlin compiler not found: $kotlinc")

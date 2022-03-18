@@ -1,10 +1,54 @@
 package ru.fomenkov.runner.update
 
+import ru.fomenkov.plugin.util.exec
+import ru.fomenkov.runner.CHECK_UPDATE_INTERVAL
+import ru.fomenkov.runner.logger.Log
 import ru.fomenkov.runner.params.RunnerParams
+import java.io.File
+import kotlin.math.abs
 
-interface Updater {
+abstract class Updater(
+    private val updateTimestampFile: String,
+    private val artifactVersionInfoUrl: String,
+) {
 
-    fun isNeedToCheckVersion(): Boolean
+    protected fun isNeedToCheckVersion(): Boolean {
+        val tmpDir = exec("echo \$TMPDIR").firstOrNull() ?: ""
+        check(tmpDir.isNotBlank()) { "Failed to get /tmp directory" }
+        val updateFile = File("$tmpDir/$updateTimestampFile")
 
-    fun checkForUpdate(params: RunnerParams, forceCheck: Boolean)
+        fun writeTimestamp() {
+            val timestampNow = System.currentTimeMillis()
+            updateFile.writeText(timestampNow.toString())
+        }
+        return if (updateFile.exists()) {
+            val timestampLastUpdate = updateFile.readText().toLong()
+            val timestampNow = System.currentTimeMillis()
+
+            if (abs(timestampNow - timestampLastUpdate) > CHECK_UPDATE_INTERVAL) {
+                writeTimestamp()
+                true
+            } else {
+                false
+            }
+        } else {
+            writeTimestamp()
+            true
+        }
+    }
+
+    protected fun getVersionInfo(): Pair<String, String> {
+        val lines = exec("curl -s $artifactVersionInfoUrl")
+
+        if (lines.size == 2) {
+            val version = lines.first().trim()
+            val artifactUrl = lines.last().trim()
+            return version to artifactUrl
+        } else {
+            lines.forEach { line -> Log.e("[CURL] $line") }
+            error("Failed to download version-info")
+        }
+    }
+
+    abstract fun checkForUpdate(params: RunnerParams, forceCheck: Boolean)
 }

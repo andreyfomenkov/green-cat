@@ -8,10 +8,10 @@ import ru.fomenkov.runner.params.RunnerMode
 import ru.fomenkov.runner.params.RunnerParams
 import ru.fomenkov.runner.ssh.setRemoteHost
 import ru.fomenkov.runner.ssh.ssh
+import ru.fomenkov.runner.update.CompilerUpdater
 import ru.fomenkov.runner.update.PluginUpdater
 import java.io.File
 import java.util.concurrent.TimeUnit
-import kotlin.math.abs
 
 private var displayTotalTime = false
 
@@ -38,18 +38,21 @@ private fun launch(args: Array<String>): RunnerParams? {
     Log.d("Project on GitHub: $PROJECT_GITHUB\n")
     validateShellCommands()
 
-    val pluginUpdater = PluginUpdater()
+    val pluginUpdater = PluginUpdater(PLUGIN_UPDATE_TIMESTAMP_FILE, PLUGIN_ARTIFACT_VERSION_INFO_URL)
+    val compilerUpdated = CompilerUpdater(COMPILER_UPDATE_TIMESTAMP_FILE, COMPILER_ARTIFACT_VERSION_INFO_URL)
     val params = readParams(args) ?: return null
     setRemoteHost(host = params.sshHost)
 
     if (params.mode == RunnerMode.Update) {
         pluginUpdater.checkForUpdate(params, forceCheck = true)
+        compilerUpdated.checkForUpdate(params, forceCheck = true)
         return null
 
     } else {
         val supported = checkGitDiff() ?: return null
         syncWithMainframer(params, supported)
         pluginUpdater.checkForUpdate(params, forceCheck = false)
+        compilerUpdated.checkForUpdate(params, forceCheck = false)
         startGreenCatPlugin(params)
         pushDexToAndroidDevice(params)
         displayTotalTime = true
@@ -209,14 +212,17 @@ private fun validateShellCommands() {
 }
 
 const val PROJECT_GITHUB = "https://github.com/andreyfomenkov/green-cat"
-const val ARTIFACT_VERSION_INFO_URL = "https://raw.githubusercontent.com/andreyfomenkov/green-cat/master/artifacts/version-info"
+const val PLUGIN_ARTIFACT_VERSION_INFO_URL = "https://raw.githubusercontent.com/andreyfomenkov/green-cat/master/artifacts/version-info"
+const val COMPILER_ARTIFACT_VERSION_INFO_URL = "https://raw.githubusercontent.com/andreyfomenkov/kotlin-relaxed/relaxed-restrictions/artifact/date"
 const val GREENCAT_JAR = "greencat.jar"
 const val CLASSPATH_DIR = "cp"
 const val SOURCE_FILES_DIR = "src"
 const val CLASS_FILES_DIR = "class"
 const val DEX_FILES_DIR = "dex"
-const val KOTLINC_RELAXED_DIR = "kotlinc-relaxed"
+const val KOTLINC_DIR = "kotlinc"
+const val KOTLINC_VERSION_FILE = "date"
 const val ANDROID_DEVICE_DEX_DIR = "/data/local/tmp"
 const val OUTPUT_DEX_FILE = "patch.dex"
 const val PLUGIN_UPDATE_TIMESTAMP_FILE = "greencat_update"
+const val COMPILER_UPDATE_TIMESTAMP_FILE = "compiler_update"
 val CHECK_UPDATE_INTERVAL = TimeUnit.HOURS.toMillis(1)
