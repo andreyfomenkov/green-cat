@@ -96,8 +96,9 @@ class CompileTask(
         }
         val classDir = "$greencatRoot/$CLASS_FILES_DIR".noTilda()
         val srcFilesLine = srcFiles.joinToString(separator = " ")
+        val moduleNameArg = "-module-name ${moduleName.replace("-", "_")}_debug"
         val friendPaths = getFriendModulePaths(moduleName, moduleClasspath).joinToString(separator = ",")
-        val cmd = "$kotlinc -Xjvm-default=all-compatibility -Xfriend-paths=$friendPaths -d $classDir -classpath $moduleClasspath $srcFilesLine"
+        val cmd = "$kotlinc -Xjvm-default=all-compatibility -Xfriend-paths=$friendPaths $moduleNameArg -d $classDir -classpath $moduleClasspath $srcFilesLine"
         val lines = exec(cmd)
         val inputFileNames = srcFiles.map { path -> File(path).nameWithoutExtension }.toSet()
         val outputFileNames = exec("find $classDir -name '*.class'").map { path -> File(path).nameWithoutExtension }.toSet()
@@ -116,16 +117,45 @@ class CompileTask(
         val classDir = "$greencatRoot/$CLASS_FILES_DIR".noTilda()
         val dexDir = "$greencatRoot/$DEX_FILES_DIR".noTilda()
         val dexFilePath = "$dexDir/$OUTPUT_DEX_FILE".noTilda()
-        val d8ToolPath = findD8Tool()
+        val buildToolsDir = getBuildToolsDir()
+        val d8ToolPath = "$buildToolsDir/d8"
+        val dexDumpToolPath = "$buildToolsDir/dexdump"
 
         if (File(dexFilePath).exists()) {
             error("DEX file is not cleared")
         }
-        val classFilePaths = exec("find $classDir -name '*.class'")
-            .filterNot { path -> path.contains("$") }
-            .joinToString(separator = " ")
+        val allDirs = exec("find $classDir -type d")
+        val classDirs = mutableSetOf<String>()
 
-        val output = exec("$d8ToolPath $classFilePaths --output $dexDir --classpath $classDir")
+        if (allDirs.isEmpty()) {
+            error("No subdirectories found")
+        }
+        allDirs.forEach { dir ->
+            val files = File(dir).list() ?: emptyArray()
+            val hasClassFiles = files.firstOrNull { file -> file.endsWith(".class") } != null
+
+            if (hasClassFiles) {
+                classDirs += "$dir/*.class"
+            }
+        }
+        if (classDirs.isEmpty()) {
+            error("No subdirectories with class files found")
+        }
+        val inputDirs = classDirs.joinToString(separator = " ")
+        val output = exec("$d8ToolPath $inputDirs --output $dexDir --classpath $classDir")
+        val entries = exec("$dexDumpToolPath $dexDir/$standardDexFileName | grep 'Class descriptor'")
+        Telemetry.log("Output DEX file contains ${entries.size} class entries:\n")
+
+        entries.forEach { line ->
+            val startIndex = line.indexOfFirst { c -> c == '\'' }
+            val endIndex = line.indexOfLast { c -> c == ';' }
+
+            if (startIndex == -1 || endIndex == -1) {
+                error("Failed to parse dexdump output")
+            }
+            Telemetry.log(" # ${line.substring(startIndex + 1, endIndex)}")
+        }
+        Telemetry.log("")
 
         File("$dexDir/$standardDexFileName").apply {
             if (!exists()) {
@@ -138,7 +168,7 @@ class CompileTask(
         }
     }
 
-    private fun findD8Tool() = File("$androidSdkRoot/build-tools").run {
+    private fun getBuildToolsDir() = File("$androidSdkRoot/build-tools").run {
         if (!exists()) {
             error("No build-tools directory in Android SDK: $absolutePath")
         }
@@ -147,15 +177,7 @@ class CompileTask(
         if (dirs.isNullOrEmpty()) {
             error("No build tools installed")
         }
-        val buildToolsDir = dirs.sortedDescending()[0]
-        val d8ToolPath = "${buildToolsDir.absolutePath}/d8"
-
-        if (File(d8ToolPath).exists()) {
-            Telemetry.log("Using D8 tool: $d8ToolPath")
-        } else {
-            error("No D8 tool found in ${buildToolsDir.absolutePath}")
-        }
-        d8ToolPath
+        dirs.sortedDescending()[0].absolutePath
     }
 
     private fun clearDirectory(dirName: String) {
