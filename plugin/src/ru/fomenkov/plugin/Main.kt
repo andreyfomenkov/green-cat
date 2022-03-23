@@ -10,7 +10,7 @@ import java.util.concurrent.Executors
 
 private const val GRADLE_PROPERTIES_FILE_NAME = "gradle.properties"
 private const val GRADLE_SETTINGS_FILE_NAME = "settings.gradle"
-private const val PLUGIN_VERSION = "1.1"
+private const val PLUGIN_VERSION = "1.2"
 private val cpuCount = Runtime.getRuntime().availableProcessors()
 private val executor = Executors.newFixedThreadPool(cpuCount)
 

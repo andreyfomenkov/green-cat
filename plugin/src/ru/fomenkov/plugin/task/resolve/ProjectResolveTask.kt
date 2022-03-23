@@ -324,8 +324,10 @@ class ProjectResolveTask(
             val modulePath = moduleNameToPathMap[name]
             checkNotNull(modulePath) { "No path for module: $name" }
             val buildPath = "$CURRENT_DIR/$modulePath/build"
-            checkPathExists(buildPath)
 
+            if (!File(buildPath).exists()) {
+                Telemetry.err("Build path doesn't exist: $buildPath")
+            }
             // TODO: refactor
             "$buildPath/intermediates/javac/debug/classes".apply { if (File(this).exists()) classpath += this }
             "$buildPath/intermediates/javac/debugAndroidTest/classes".apply { if (File(this).exists()) classpath += this }
