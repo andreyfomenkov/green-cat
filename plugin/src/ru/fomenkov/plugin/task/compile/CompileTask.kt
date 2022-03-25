@@ -78,7 +78,7 @@ class CompileTask(
     private fun compileWithJavac(srcFiles: Set<String>, moduleName: String, moduleClasspath: String): CompilationResult {
         val classDir = "$greencatRoot/$CLASS_FILES_DIR".noTilda()
         val srcFilesLine = srcFiles.joinToString(separator = " ")
-        val lines = exec("javac -encoding utf-8 -cp $moduleClasspath -d $classDir $srcFilesLine")
+        val lines = exec("javac -encoding utf-8 -g -cp $moduleClasspath -d $classDir $srcFilesLine")
         val inputFileNames = srcFiles.map { path -> File(path).nameWithoutExtension }.toSet()
         val outputFileNames = exec("find $classDir -name '*.class'").map { path -> File(path).nameWithoutExtension }.toSet()
 
