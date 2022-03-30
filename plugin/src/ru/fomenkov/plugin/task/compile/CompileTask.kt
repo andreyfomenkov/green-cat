@@ -36,12 +36,16 @@ class CompileTask(
                 val srcFiles = checkNotNull(projectInfo.sourceFilesMap[moduleName]) {
                     "No source files for module $moduleName"
                 }
-                val classpath = checkNotNull(projectInfo.moduleClasspathMap[moduleName]) {
+                val moduleClasspath = checkNotNull(projectInfo.moduleClasspathMap[moduleName]) {
                     "No classpath for module $moduleName"
                 }
+                val greencatClassDir = "$greencatRoot/$CLASS_FILES_DIR"
                 val javaSrcFiles = srcFiles.filter { path -> path.endsWith(".java") }.toSet()
                 val kotlinSrcFiles = srcFiles.filter { path -> path.endsWith(".kt") }.toSet()
-
+                val classpath = when (File(greencatClassDir).exists()) {
+                    true -> "$greencatClassDir:$moduleClasspath"
+                    else -> moduleClasspath
+                }
                 Callable {
                     val result = when (javaSrcFiles.isEmpty()) {
                         true -> CompilationResult.Successful
