@@ -82,7 +82,13 @@ class CompileTask(
     private fun compileWithJavac(srcFiles: Set<String>, moduleName: String, moduleClasspath: String): CompilationResult {
         val classDir = "$greencatRoot/$CLASS_FILES_DIR".noTilda()
         val srcFilesLine = srcFiles.joinToString(separator = " ")
-        val lines = exec("javac -encoding utf-8 -g -cp $moduleClasspath -d $classDir $srcFilesLine")
+        var javac = exec("echo \$JAVA_HOME/bin/javac").first()
+
+        if (!File(javac).exists()) {
+            javac = "javac"
+        }
+        Telemetry.log("Using Java compiler: $javac")
+        val lines = exec("$javac -source 1.8 -target 1.8 -encoding utf-8 -g -cp $moduleClasspath -d $classDir $srcFilesLine")
         val inputFileNames = srcFiles.map { path -> File(path).nameWithoutExtension }.toSet()
         val outputFileNames = exec("find $classDir -name '*.class'").map { path -> File(path).nameWithoutExtension }.toSet()
 
@@ -146,7 +152,22 @@ class CompileTask(
             error("No subdirectories with class files found")
         }
         val inputDirs = classDirs.joinToString(separator = " ")
-        val output = exec("$d8ToolPath $inputDirs --output $dexDir --classpath $classDir")
+        val buildDirs = mutableSetOf<String>()
+        buildDirs += classDir
+
+        // TODO: optimize - include only related build dirs
+
+        projectInfo.sourceFilesMap.keys.forEach { moduleName ->
+            val moduleClasspath = checkNotNull(projectInfo.moduleClasspathMap[moduleName]) {
+                "No classpath for module: $moduleName"
+            }
+            buildDirs += moduleClasspath.split(":")
+                .filter { path -> path.contains("/build/") }
+                .filter { path -> File(path).exists() }
+                .filter { path -> File(path).isDirectory }
+        }
+        val classpath = buildDirs.joinToString(separator = " --classpath ")
+        val output = exec("$d8ToolPath $inputDirs --intermediate --output $dexDir --classpath $classpath")
         val entries = exec("$dexDumpToolPath $dexDir/$standardDexFileName | grep 'Class descriptor'")
         Telemetry.log("Output DEX file contains ${entries.size} class entries:\n")
 
