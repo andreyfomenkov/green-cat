@@ -20,12 +20,16 @@ class CompileTask(
         clearDirectory(CLASS_FILES_DIR)
         clearDirectory(DEX_FILES_DIR)
         val orderMap = mutableMapOf<Int, MutableSet<String>>()
+        resolveGeneratedClasses()
 
         projectInfo.moduleCompilationOrderMap.forEach { (moduleName: String, order: Int) ->
             val modules = orderMap[order] ?: mutableSetOf()
             modules += moduleName
             orderMap[order] = modules
         }
+        val classesTask = Callable { resolveGeneratedClasses() }
+            .run { executor.submit(this) }
+
         orderMap.keys.sorted().forEach { order ->
             val modules = checkNotNull(orderMap[order]) {
                 "No modules for compilation order $order"
@@ -71,7 +75,48 @@ class CompileTask(
                 }
             }
         }
-        runD8()
+        runD8(classesMap = classesTask.get())
+    }
+
+    /**
+     * Maps canonical class name to it's path
+     */
+    private fun resolveGeneratedClasses(): Map<String, String> {
+        val currentDir = File("").absolutePath // TODO: refactor
+        val map = mutableMapOf<String, String>()
+        val dirFilter = "/debug/classes/"
+
+        File(currentDir).list()?.forEach { dir ->
+                val buildDir = "$currentDir/$dir/build/intermediates/javac"
+
+                if (File(buildDir).exists()) {
+                    exec("find $buildDir -name '*.class'").forEach { path ->
+                        val index = path.indexOf(dirFilter)
+
+                        if (index != -1) {
+                            val className = path.substring(index + dirFilter.length, path.length - 6).replace("/", ".")
+                            map += className to path
+                        }
+                    }
+                }
+            }
+        return map
+    }
+
+    private fun buildSourceFileClasspathForD8(moduleName: String, sourceFilePath: String, classesMap: Map<String, String>): Set<String> {
+        val projectDir = File("").absoluteFile
+        val list = mutableSetOf<String>()
+        val imports = exec("cat $sourceFilePath | grep 'import'") // TODO: refactor
+            .map { line -> line.replace("import", "") }
+            .map { line -> line.replace(";", "") }
+            .map { line -> line.split("//").first() }
+            .map { line -> line.trim() }
+        list += "$greencatRoot/$CLASS_FILES_DIR"
+        list += "$projectDir/$moduleName/build/intermediates/javac/debug/classes"
+        list += imports.mapNotNull { className -> classesMap[className] }
+        return list
+            .filter { path -> File(path).exists() }
+            .toSet()
     }
 
     private fun deleteClasspathForModule(moduleName: String) {
@@ -99,7 +144,8 @@ class CompileTask(
     }
 
     private fun compileWithKotlin(srcFiles: Set<String>, moduleName: String, moduleClasspath: String): CompilationResult {
-        val kotlinc = "$greencatRoot/$KOTLINC_DIR/bin/kotlinc".noTilda()
+        val kotlinDir = "$greencatRoot/$KOTLINC_DIR"
+        val kotlinc = "$kotlinDir/bin/kotlinc".noTilda()
 
         if (!File(kotlinc).exists()) {
             error("Kotlin compiler not found: $kotlinc")
@@ -122,7 +168,14 @@ class CompileTask(
     private fun getFriendModulePaths(moduleName: String, moduleClasspath: String) =
         moduleClasspath.split(":").filter { path -> path.contains("$moduleName/build") }
 
-    private fun runD8() {
+    private fun runD8(classesMap: Map<String, String>) {
+        val paths = mutableSetOf<String>()
+
+        projectInfo.sourceFilesMap.forEach { (moduleName, sourceFiles) ->
+            sourceFiles.forEach { path ->
+                paths += buildSourceFileClasspathForD8(moduleName, path, classesMap)
+            }
+        }
         val standardDexFileName = "classes.dex"
         val classDir = "$greencatRoot/$CLASS_FILES_DIR".noTilda()
         val dexDir = "$greencatRoot/$DEX_FILES_DIR".noTilda()
@@ -153,34 +206,28 @@ class CompileTask(
         }
         val inputDirs = classDirs.joinToString(separator = " ")
         val buildDirs = mutableSetOf<String>()
-        buildDirs += classDir
+        buildDirs += classDir // TODO: refactor
+//        buildDirs += paths
 
-        // TODO: optimize - include only related build dirs
-
-        projectInfo.sourceFilesMap.keys.forEach { moduleName ->
-            val moduleClasspath = checkNotNull(projectInfo.moduleClasspathMap[moduleName]) {
-                "No classpath for module: $moduleName"
-            }
-            buildDirs += moduleClasspath.split(":")
-                .filter { path -> path.contains("/build/") }
-                .filter { path -> File(path).exists() }
-                .filter { path -> File(path).isDirectory }
-        }
         val classpath = buildDirs.joinToString(separator = " --classpath ")
-        val output = exec("$d8ToolPath $inputDirs --intermediate --output $dexDir --classpath $classpath")
-        val entries = exec("$dexDumpToolPath $dexDir/$standardDexFileName | grep 'Class descriptor'")
-        Telemetry.log("Output DEX file contains ${entries.size} class entries:\n")
 
-        entries.forEach { line ->
-            val startIndex = line.indexOfFirst { c -> c == '\'' }
-            val endIndex = line.indexOfLast { c -> c == ';' }
+        Telemetry.log(">>>>>>>>>>>>>>>>>> $classpath")
 
-            if (startIndex == -1 || endIndex == -1) {
-                error("Failed to parse dexdump output")
-            }
-            Telemetry.log(" # ${line.substring(startIndex + 1, endIndex)}")
-        }
-        Telemetry.log("")
+        val output = exec("$d8ToolPath $inputDirs --output --intermediate $dexDir --classpath /home/andrey.fomenkov/mainframer/ok/odnoklassniki-stream-engine/build/intermediates/javac/debug/classes")
+//        val entries = exec("$dexDumpToolPath $dexDir/$standardDexFileName | grep 'Class descriptor'")
+//        Telemetry.log("Output DEX file contains ${entries.size} class entries:\n")
+
+//        entries.forEach { line ->
+//            val startIndex = line.indexOfFirst { c -> c == '\'' }
+//            val endIndex = line.indexOfLast { c -> c == ';' }
+//
+//            if (startIndex == -1 || endIndex == -1) {
+//                error("Failed to parse dexdump output")
+//            }
+//            Telemetry.log(" # ${line.substring(startIndex + 1, endIndex)}")
+//            Telemetry.log(" # $line")
+//        }
+//        Telemetry.log("")
 
         File("$dexDir/$standardDexFileName").apply {
             if (!exists()) {
