@@ -2,10 +2,15 @@ package ru.fomenkov.plugin
 
 import ru.fomenkov.plugin.params.Param
 import ru.fomenkov.plugin.params.PluginParamsReader
+import ru.fomenkov.plugin.repository.ClassFileRepository
+import ru.fomenkov.plugin.repository.JetifiedJarRepository
+import ru.fomenkov.plugin.repository.SupportJarRepository
 import ru.fomenkov.plugin.task.compile.CompileTask
 import ru.fomenkov.plugin.task.resolve.ProjectResolveTask
 import ru.fomenkov.plugin.task.resolve.ProjectResolverInput
 import ru.fomenkov.plugin.util.Telemetry
+import ru.fomenkov.plugin.util.formatMillis
+import ru.fomenkov.plugin.util.timeMillis
 import java.util.concurrent.Executors
 
 private const val GRADLE_PROPERTIES_FILE_NAME = "gradle.properties"
@@ -16,7 +21,44 @@ private val executor = Executors.newFixedThreadPool(cpuCount)
 
 fun main(args: Array<String>) = try {
     Telemetry.isVerbose = false
-    launch(args)
+//    launch(args)
+    //
+    val classFileRepo = ClassFileRepository()
+    val jetifiedJarRepo = JetifiedJarRepository()
+    val supportJarRepo = SupportJarRepository()
+
+    val scanTime = timeMillis {
+        classFileRepo.scan()
+        jetifiedJarRepo.scan()
+        supportJarRepo.scan()
+    }
+    val findTime = timeMillis {
+        val packageName = "ru.ok.android.rxbillingmanager.model" // TODO: static imports
+        val classFileResource = classFileRepo.find(packageName)
+
+        if (classFileResource != null) {
+            Telemetry.log("$packageName found in class file repository: $classFileResource")
+        } else {
+            val jetifiedJarResource = jetifiedJarRepo.find(packageName)
+
+            if (jetifiedJarResource != null) {
+                Telemetry.log("$packageName found in jetified JAR repository: $jetifiedJarResource")
+            } else {
+                val supportJarResource = supportJarRepo.find(packageName)
+
+                if (supportJarResource != null) {
+                    Telemetry.log("$packageName found in support JAR repository: $supportJarResource")
+                } else {
+                    Telemetry.err("$packageName not found. Traversing subtree")
+
+                    (classFileRepo.subtree(packageName) + jetifiedJarRepo.subtree(packageName) + supportJarRepo.subtree(packageName))
+                        .forEach { Telemetry.log("[RES] $it") }
+                }
+            }
+        }
+    }
+    Telemetry.log("\nScan time total: ${formatMillis(scanTime)}, find time: ${formatMillis(findTime)}")
+    //
 
 } catch (error: Throwable) {
     when (error.message.isNullOrBlank()) {
