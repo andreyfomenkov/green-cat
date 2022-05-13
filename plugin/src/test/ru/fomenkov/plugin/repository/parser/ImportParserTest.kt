@@ -1,6 +1,7 @@
-package ru.fomenkov.plugin.repository.imports
+package ru.fomenkov.plugin.repository.parser
 
 import org.junit.jupiter.api.Test
+import ru.fomenkov.plugin.repository.data.Import
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 

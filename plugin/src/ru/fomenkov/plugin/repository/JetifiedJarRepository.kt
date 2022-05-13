@@ -1,6 +1,6 @@
 package ru.fomenkov.plugin.repository
 
-import ru.fomenkov.plugin.repository.data.JarResource
+import ru.fomenkov.plugin.repository.data.RepositoryResource
 import ru.fomenkov.plugin.util.Telemetry
 import ru.fomenkov.plugin.util.timeMillis
 import java.io.File
@@ -18,7 +18,7 @@ class JetifiedJarRepository : JarRepository() {
         val time = timeMillis {
             val files = File("/Users/andrey.fomenkov/.gradle/caches/transforms-3").listFiles()!! // TODO
             val latch = CountDownLatch(files.size)
-            val output = ConcurrentHashMap<String, JarResource>()
+            val output = ConcurrentHashMap<String, RepositoryResource.JarResource>()
 
             files.forEach { dir ->
                 executor.submit {
@@ -34,7 +34,10 @@ class JetifiedJarRepository : JarRepository() {
                                 val packageName = getPackageName(entry)
 
                                 if (packageName != null) {
-                                    val resource = JarResource(packageName = packageName, jarFilePath = jar.absolutePath)
+                                    val resource = RepositoryResource.JarResource(
+                                        packageName = packageName,
+                                        jarFilePath = jar.absolutePath
+                                    )
                                     output += packageName to resource
                                 }
                             }

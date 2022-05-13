@@ -1,9 +1,10 @@
 package ru.fomenkov.plugin.repository
 
+import ru.fomenkov.plugin.repository.data.RepositoryResource
 import ru.fomenkov.plugin.repository.tree.Tree
 import ru.fomenkov.plugin.util.PackageNameUtil
 
-abstract class ResourceRepository<T> {
+abstract class ResourceRepository<T : RepositoryResource> {
 
     private val tree = Tree<T>()
 

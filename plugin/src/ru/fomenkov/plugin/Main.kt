@@ -5,10 +5,14 @@ import ru.fomenkov.plugin.params.PluginParamsReader
 import ru.fomenkov.plugin.repository.ClassFileRepository
 import ru.fomenkov.plugin.repository.JetifiedJarRepository
 import ru.fomenkov.plugin.repository.SupportJarRepository
+import ru.fomenkov.plugin.repository.data.RepositoryResource
+import ru.fomenkov.plugin.repository.parser.ImportParser
+import ru.fomenkov.plugin.repository.parser.SourceFileReader
 import ru.fomenkov.plugin.task.compile.CompileTask
 import ru.fomenkov.plugin.task.resolve.ProjectResolveTask
 import ru.fomenkov.plugin.task.resolve.ProjectResolverInput
 import ru.fomenkov.plugin.util.Telemetry
+import ru.fomenkov.plugin.util.exec
 import ru.fomenkov.plugin.util.formatMillis
 import ru.fomenkov.plugin.util.timeMillis
 import java.util.concurrent.Executors
@@ -26,38 +30,31 @@ fun main(args: Array<String>) = try {
     val classFileRepo = ClassFileRepository()
     val jetifiedJarRepo = JetifiedJarRepository()
     val supportJarRepo = SupportJarRepository()
+    val importParser = ImportParser()
 
     val scanTime = timeMillis {
         classFileRepo.scan()
         jetifiedJarRepo.scan()
         supportJarRepo.scan()
     }
-    val findTime = timeMillis {
-        val packageName = "ru.ok.android.rxbillingmanager.model" // TODO: static imports
-        val classFileResource = classFileRepo.find(packageName)
+    val reader = SourceFileReader(importParser, classFileRepo, jetifiedJarRepo, supportJarRepo)
+    val imports = reader.parseImports(
+        "odnoklassniki-profile/src/main/java/ru/ok/android/profile/BaseProfileFragment.java",
+        verbose = true,
+    )
+    val resources = reader.resolveImports(imports, verbose = true)
+    Telemetry.log("\nScan time total: ${formatMillis(scanTime)}")
 
-        if (classFileResource != null) {
-            Telemetry.log("$packageName found in class file repository: $classFileResource")
-        } else {
-            val jetifiedJarResource = jetifiedJarRepo.find(packageName)
-
-            if (jetifiedJarResource != null) {
-                Telemetry.log("$packageName found in jetified JAR repository: $jetifiedJarResource")
-            } else {
-                val supportJarResource = supportJarRepo.find(packageName)
-
-                if (supportJarResource != null) {
-                    Telemetry.log("$packageName found in support JAR repository: $supportJarResource")
-                } else {
-                    Telemetry.err("$packageName not found. Traversing subtree")
-
-                    (classFileRepo.subtree(packageName) + jetifiedJarRepo.subtree(packageName) + supportJarRepo.subtree(packageName))
-                        .forEach { Telemetry.log("[RES] $it") }
-                }
-            }
+    val classpath = resources.resolvedImports.values.map { res ->
+        when (res) {
+            is RepositoryResource.ClassResource -> "/Users/andrey.fomenkov/Workspace/ok/" + res.classFilePath
+            is RepositoryResource.JarResource -> res.jarFilePath
         }
     }
-    Telemetry.log("\nScan time total: ${formatMillis(scanTime)}, find time: ${formatMillis(findTime)}")
+    val cp = classpath.joinToString(separator = ":")
+
+    exec("javac odnoklassniki-profile/src/main/java/ru/ok/android/profile/BaseProfileFragment.java -cp $cp")
+        .forEach(Telemetry::log)
     //
 
 } catch (error: Throwable) {

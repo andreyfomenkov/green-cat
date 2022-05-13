@@ -1,5 +1,6 @@
-package ru.fomenkov.plugin.repository.imports
+package ru.fomenkov.plugin.repository.parser
 
+import ru.fomenkov.plugin.repository.data.Import
 import java.lang.Integer.min
 
 class ImportParser {
