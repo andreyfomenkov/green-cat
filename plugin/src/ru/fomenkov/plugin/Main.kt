@@ -2,19 +2,11 @@ package ru.fomenkov.plugin
 
 import ru.fomenkov.plugin.params.Param
 import ru.fomenkov.plugin.params.PluginParamsReader
-import ru.fomenkov.plugin.repository.ClassFileRepository
-import ru.fomenkov.plugin.repository.JetifiedJarRepository
-import ru.fomenkov.plugin.repository.SupportJarRepository
-import ru.fomenkov.plugin.repository.data.RepositoryResource
-import ru.fomenkov.plugin.repository.parser.ImportParser
-import ru.fomenkov.plugin.repository.parser.SourceFileReader
-import ru.fomenkov.plugin.task.compile.CompileTask
+import ru.fomenkov.plugin.repository.ArtifactDependencyResolver
+import ru.fomenkov.plugin.repository.parser.PomFileParser
 import ru.fomenkov.plugin.task.resolve.ProjectResolveTask
 import ru.fomenkov.plugin.task.resolve.ProjectResolverInput
 import ru.fomenkov.plugin.util.Telemetry
-import ru.fomenkov.plugin.util.exec
-import ru.fomenkov.plugin.util.formatMillis
-import ru.fomenkov.plugin.util.timeMillis
 import java.util.concurrent.Executors
 
 private const val GRADLE_PROPERTIES_FILE_NAME = "gradle.properties"
@@ -25,37 +17,7 @@ private val executor = Executors.newFixedThreadPool(cpuCount)
 
 fun main(args: Array<String>) = try {
     Telemetry.isVerbose = false
-//    launch(args)
-    //
-    val classFileRepo = ClassFileRepository()
-    val jetifiedJarRepo = JetifiedJarRepository()
-    val supportJarRepo = SupportJarRepository()
-    val importParser = ImportParser()
-
-    val scanTime = timeMillis {
-        classFileRepo.scan()
-        jetifiedJarRepo.scan()
-        supportJarRepo.scan()
-    }
-    val reader = SourceFileReader(importParser, classFileRepo, jetifiedJarRepo, supportJarRepo)
-    val imports = reader.parseImports(
-        "odnoklassniki-profile/src/main/java/ru/ok/android/profile/BaseProfileFragment.java",
-        verbose = true,
-    )
-    val resources = reader.resolveImports(imports, verbose = true)
-    Telemetry.log("\nScan time total: ${formatMillis(scanTime)}")
-
-    val classpath = resources.resolvedImports.values.map { res ->
-        when (res) {
-            is RepositoryResource.ClassResource -> "/Users/andrey.fomenkov/Workspace/ok/" + res.classFilePath
-            is RepositoryResource.JarResource -> res.jarFilePath
-        }
-    }
-    val cp = classpath.joinToString(separator = ":")
-
-    exec("javac odnoklassniki-profile/src/main/java/ru/ok/android/profile/BaseProfileFragment.java -cp $cp")
-        .forEach(Telemetry::log)
-    //
+    launch(args)
 
 } catch (error: Throwable) {
     when (error.message.isNullOrBlank()) {
@@ -76,13 +38,15 @@ private fun launch(args: Array<String>) {
         greencatRoot = params.greencatRoot,
         mappedModules = params.mappedModules,
     )
-    val projectInfo = ProjectResolveTask(projectResolverInput, executor).run()
-    CompileTask(
-        greencatRoot = params.greencatRoot,
-        androidSdkRoot = params.androidSdkRoot,
-        projectInfo = projectInfo,
-        executor = executor,
-    ).run()
+    val pomFileParser = PomFileParser()
+    val artifactResolver = ArtifactDependencyResolver(pomFileParser)
+    val projectInfo = ProjectResolveTask(projectResolverInput, artifactResolver, executor).run()
+//    CompileTask(
+//        greencatRoot = params.greencatRoot,
+//        androidSdkRoot = params.androidSdkRoot,
+//        projectInfo = projectInfo,
+//        executor = executor,
+//    ).run()
     Telemetry.log("DEX file successfully generated")
 }
 

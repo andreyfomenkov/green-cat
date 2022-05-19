@@ -22,6 +22,8 @@ abstract class ResourceRepository<T : RepositoryResource> {
 
     fun size() = tree.size()
 
+    fun get() = tree.getAllValues()
+
     protected fun add(packageName: String, value: T) {
         val route = PackageNameUtil.split(packageName)
         tree.setValue(route, value)

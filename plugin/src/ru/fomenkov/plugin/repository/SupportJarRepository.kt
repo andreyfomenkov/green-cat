@@ -17,15 +17,16 @@ class SupportJarRepository : JarRepository() {
         val executor = Executors.newFixedThreadPool(cpus)
 
         val time = timeMillis {
-            val dirs = File("/Users/andrey.fomenkov/.gradle/caches/modules-2/files-2.1") // TODO
-                .listFiles()!!
-                .filter { file -> file.isDirectory }
+            val files = File("/Users/andrey.fomenkov/.gradle/caches/modules-2/files-2.1").listFiles() // TODO
+            val dirs = checkNotNull(files) { "No files listed" }.filter { file -> file.isDirectory }
             val latch = CountDownLatch(dirs.size)
-            val output = ConcurrentHashMap<String, RepositoryResource.JarResource>()
+            val jarsOutput = ConcurrentHashMap<String, RepositoryResource.JarResource>()
 
             dirs.forEach { dir ->
                 executor.submit {
-                    val jars = exec("find ${dir.absolutePath} -name '*.jar'")
+                    val resources = exec("find ${dir.absolutePath}")
+                    val jars = resources
+                        .filter { path -> path.endsWith(".jar") }
                         .filterNot { path -> path.endsWith("-sources.jar") }
                         .filterNot { path -> path.endsWith("-javadoc.jar") }
 
@@ -37,7 +38,7 @@ class SupportJarRepository : JarRepository() {
 
                             if (packageName != null) {
                                 val resource = RepositoryResource.JarResource(packageName = packageName, jarFilePath = path)
-                                output += packageName to resource
+                                jarsOutput += packageName to resource
                             }
                         }
                     }
@@ -46,8 +47,7 @@ class SupportJarRepository : JarRepository() {
             }
             latch.await()
             executor.shutdown()
-            output.forEach(this::add)
-
+            jarsOutput.forEach(this::add)
         }
         Telemetry.log("Scan support JAR files: $time ms")
     }

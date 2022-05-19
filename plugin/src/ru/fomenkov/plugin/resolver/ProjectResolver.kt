@@ -1,5 +1,8 @@
 package ru.fomenkov.plugin.resolver
 
+import ru.fomenkov.plugin.repository.data.PomDependency
+import ru.fomenkov.plugin.repository.data.PomDependencyScope
+import ru.fomenkov.plugin.task.resolve.GradleCacheItem
 import ru.fomenkov.plugin.util.*
 import java.io.File
 import java.io.FileFilter
@@ -248,12 +251,12 @@ class ProjectResolver(
                         if (!insideBlock) {
                             error("Unexpected line: $line")
                         }
-                        deps += PomDependency(
-                            groupId = checkNotNull(depGroupId) { "No parameter groupId: ${pomFile.absolutePath}" },
-                            artifactId = checkNotNull(depArtifactId) { "No parameter artifactId: ${pomFile.absolutePath}" },
-                            version = depVersion,
-                            scope = scope,
-                        )
+//                        deps += PomDependency(
+//                            groupId = checkNotNull(depGroupId) { "No parameter groupId: ${pomFile.absolutePath}" },
+//                            artifactId = checkNotNull(depArtifactId) { "No parameter artifactId: ${pomFile.absolutePath}" },
+//                            version = depVersion,
+//                            scope = scope,
+//                        )
                         insideBlock = false
                         depGroupId = null
                         depArtifactId = null
@@ -278,7 +281,8 @@ class ProjectResolver(
                     }
                 }
             }
-        return GradleCacheItem.Pom(pkg = pkg, artifact = artifact, version = version, dependencies = deps)
+//        return GradleCacheItem.Pom(pkg = pkg, artifact = artifact, version = version, dependencies = deps)
+        return GradleCacheItem.Pom(pkg = pkg, artifact = artifact, version = version, dependencies = emptySet())
     }
 
     private fun File.files(filter: FileFilter? = null, action: (File) -> Unit) = checkNotNull(listFiles(filter)) {
@@ -430,12 +434,17 @@ class ProjectResolver(
         moduleNameToPath: Map<String, String>, // TODO: refactor
     ): Set<Dependency> {
         val getModulePathByName = { name: String ->
-            checkNotNull(moduleNameToPath[name]) { "No module path for name: $name" }
+            val path = moduleNameToPath[name]
+            if (path == null) {
+                // May occur when dependency inside try-catch block
+                Telemetry.err("No module path for name: $name")
+            }
+            path
         }
         val getProjectDeps = { path: String ->
             checkNotNull(modules[path]) { "Module path $path not found" }
         }
-        val moduleDeps = getProjectDeps(modulePath).toMutableSet()
+        val moduleDeps = checkNotNull(getProjectDeps(modulePath)) { "No deps for module path: $modulePath" }.toMutableSet()
         val tempDeps = mutableSetOf<Dependency>()
         val resolvedModulePaths = mutableSetOf<String>()
         var hasUnresolvedProjects = true
@@ -448,11 +457,14 @@ class ProjectResolver(
                     when (dep) {
                         is Dependency.Project -> {
                             val path = getModulePathByName(dep.moduleName)
-                            tempDeps += dep.copy(relation = Relation.IMPLEMENTATION)
 
-                            if (!resolvedModulePaths.contains(path)) {
-                                resolvedModulePaths += path
-                                tempDeps += getProjectDeps(path).filter { project -> project.isTransitive() }
+                            if (path != null) {
+                                tempDeps += dep.copy(relation = Relation.IMPLEMENTATION)
+
+                                if (!resolvedModulePaths.contains(path)) {
+                                    resolvedModulePaths += path
+                                    tempDeps += getProjectDeps(path).filter { project -> project.isTransitive() }
+                                }
                             }
                         }
                         is Dependency.Library -> {

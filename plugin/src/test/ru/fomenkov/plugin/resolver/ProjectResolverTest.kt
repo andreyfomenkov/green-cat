@@ -1,6 +1,7 @@
 package ru.fomenkov.plugin.resolver
 
 import org.junit.jupiter.api.Test
+import ru.fomenkov.plugin.task.resolve.GradleCacheItem
 import ru.fomenkov.plugin.util.fromResources
 import ru.fomenkov.plugin.util.isVersionGreaterOrEquals
 import java.io.File

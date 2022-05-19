@@ -1,17 +1,18 @@
 package ru.fomenkov.plugin.task.resolve
 
-import ru.fomenkov.plugin.resolver.GradleCacheItem
+import ru.fomenkov.plugin.repository.ArtifactDependencyResolver
+import ru.fomenkov.plugin.resolver.Dependency
 import ru.fomenkov.plugin.resolver.ProjectResolver
 import ru.fomenkov.plugin.task.Task
 import ru.fomenkov.plugin.util.*
 import ru.fomenkov.runner.CLASSPATH_DIR
-import ru.fomenkov.runner.SOURCE_FILES_DIR
 import java.io.File
 import java.util.concurrent.Callable
 import java.util.concurrent.ExecutorService
 
 class ProjectResolveTask(
     private val input: ProjectResolverInput,
+    private val artifactResolver: ArtifactDependencyResolver,
     private val executor: ExecutorService,
 ) : Task<ProjectResolverOutput> {
 
@@ -21,71 +22,136 @@ class ProjectResolveTask(
     )
 
     override fun run(): ProjectResolverOutput {
+        val modulePath = "odnoklassniki-profile"
         val moduleDeclarations = resolver.parseModuleDeclarations()
         val modulePathsMap = moduleDeclarations.associate { dec -> dec.name to dec.path }
-        val srcFiles = exec("find ${input.greencatRoot}/$SOURCE_FILES_DIR").filter(::isFileSupported)
-        val srcModuleGroups = mutableMapOf<String, MutableSet<String>>() // Module name -> source files
+        val gradleProperties = mutableMapOf<String, String>()
+        val moduleDependencies = mutableMapOf<String, Set<Dependency>>()
 
-        if (srcFiles.isEmpty()) {
-            error("No files to compile")
-        } else {
-            Telemetry.log("Total ${srcFiles.size} source file(s) to compile:\n")
+        Telemetry.log("Project contains ${moduleDeclarations.size} modules")
+        gradleProperties += resolver.parseGradleProperties()
 
-            srcFiles.forEach { path ->
-                val moduleName = getSourceFileModuleName(path)
-                check(modulePathsMap.containsKey(moduleName)) { "No path for module name: $moduleName" }
+        moduleDeclarations.forEach { module ->
+            moduleDependencies += module.path to resolver.parseModuleBuildGradleFile(
+                modulePath = module.path,
+                properties = gradleProperties,
+            )
+        }
+        val deps = resolver.getAllModuleDependencies(
+            modulePath = modulePath,
+            modules = moduleDependencies,
+            moduleNameToPath = modulePathsMap,
+        )
+//        val placeholderVersions = resolver.validateAndResolveLibraryVersions(
+//            modulePath = modulePath,
+//            deps = moduleDependencies[modulePath]!!,
+//            properties = gradleProperties,
+//            moduleDeclarations = moduleDeclarations,
+//        )
 
-                val paths = srcModuleGroups[moduleName] ?: mutableSetOf()
-                paths += path
-                srcModuleGroups[moduleName] = paths
-                Telemetry.log(" - [$moduleName] $path")
+        deps.filterIsInstance(Dependency.Library::class.java).forEach { lib ->
+            var version = gradleProperties[lib.version]
+
+            if (lib.version.isBlank()) {
+                version = "" // No version, choose the latest one from the Gradle cache
+
+            } else if (version == null) {
+                // Probably it's a hardcoded version, not placeholder
+                if (lib.version[0].isDigit()) {
+                    version = lib.version
+                } else {
+                    error("Unresolved version or placeholder: ${lib.artifact}:${lib.version}")
+                }
             }
-            Telemetry.log("")
+            val parts = lib.artifact.split(":")
+            val groupId = parts.first()
+            val artifactId = parts.last()
+
+            Telemetry.log("LIB: $groupId:$artifactId:$version")
+
+            val resourcePaths = artifactResolver.resolvePaths(groupId, artifactId, version)
+            Telemetry.log(" - ${resourcePaths.size} paths")
         }
-        if (input.mappedModules.isNotEmpty()) {
-            Telemetry.log("Module mappings:\n")
 
-            input.mappedModules.forEach { (moduleFrom, moduleTo) ->
-                Telemetry.log(" - [$moduleFrom] => [$moduleTo]")
-            }
-            Telemetry.log("")
-        }
-        Telemetry.log("Project contains ${moduleDeclarations.size} module(s)")
-        Telemetry.log("Resolving project dependencies...\n")
-
-        val cpDir = "${input.greencatRoot}/$CLASSPATH_DIR".noTilda()
-        val allCpFiles = File(cpDir).listFiles(File::isFile)?.map(File::getName)?.toSet() ?: emptySet()
-        val absentCpFiles = srcModuleGroups.keys.filterNot { moduleName -> allCpFiles.contains(moduleName) }.toSet()
-
-        if (absentCpFiles.isNotEmpty()) {
-            generateClasspathFilesForModules(absentCpFiles, modulePathsMap)
-        }
-        val moduleClasspathMap = mutableMapOf<String, String>()
-        val moduleChildren = mutableMapOf<String, Set<String>>()
-
-        srcModuleGroups.keys.forEach { moduleName ->
-            val cpFilePath = "${input.greencatRoot}/$CLASSPATH_DIR/$moduleName".noTilda()
-            val cpFile = File(cpFilePath)
-
-            if (!cpFile.exists()) {
-                error("Classpath file doesn't exist: $cpFilePath")
-            }
-            val (classpath, children) = cpFile.readLines()
-            moduleClasspathMap += moduleName to classpath
-            moduleChildren += moduleName to children.split(":").toSet()
-        }
-        val moduleCompilationOrderMap = CompilationOrderResolver().getModulesCompilationOrder(moduleChildren)
-        check(srcModuleGroups.size == moduleCompilationOrderMap.size) { "Missing some modules" }
-
-        moduleCompilationOrderMap.keys.forEach { moduleName ->
-            checkNotNull(modulePathsMap[moduleName]) { "Module not found: $moduleName" }
-        }
         return ProjectResolverOutput(
-            sourceFilesMap = srcModuleGroups,
-            moduleClasspathMap = moduleClasspathMap,
-            moduleCompilationOrderMap = moduleCompilationOrderMap,
+            sourceFilesMap = emptyMap(),
+            moduleClasspathMap = emptyMap(),
+            moduleCompilationOrderMap = emptyMap(),
         )
     }
+
+//    override fun run(): ProjectResolverOutput {
+//        val moduleDeclarations = resolver.parseModuleDeclarations()
+//        val modulePathsMap = moduleDeclarations.associate { dec -> dec.name to dec.path }
+//        val srcFiles = exec("find ${input.greencatRoot}/$SOURCE_FILES_DIR").filter(::isFileSupported)
+//        val srcModuleGroups = mutableMapOf<String, MutableSet<String>>() // Module name -> source files
+//
+//        if (srcFiles.isEmpty()) {
+//            error("No files to compile")
+//        } else {
+//            Telemetry.log("Total ${srcFiles.size} source file(s) to compile:\n")
+//
+//            srcFiles.forEach { path ->
+//                val moduleName = getSourceFileModuleName(path)
+//                check(modulePathsMap.containsKey(moduleName)) { "No path for module name: $moduleName" }
+//
+//                val paths = srcModuleGroups[moduleName] ?: mutableSetOf()
+//                paths += path
+//                srcModuleGroups[moduleName] = paths
+//                Telemetry.log(" - [$moduleName] $path")
+//            }
+//            Telemetry.log("")
+//        }
+//        if (input.mappedModules.isNotEmpty()) {
+//            Telemetry.log("Module mappings:\n")
+//
+//            input.mappedModules.forEach { (moduleFrom, moduleTo) ->
+//                Telemetry.log(" - [$moduleFrom] => [$moduleTo]")
+//            }
+//            Telemetry.log("")
+//        }
+//        Telemetry.log("Project contains ${moduleDeclarations.size} module(s)")
+//        Telemetry.log("Resolving project dependencies...\n")
+//
+//        val cpDir = "${input.greencatRoot}/$CLASSPATH_DIR".noTilda()
+//        val allCpFiles = File(cpDir).listFiles(File::isFile)?.map(File::getName)?.toSet() ?: emptySet()
+//        val absentCpFiles = srcModuleGroups.keys.filterNot { moduleName -> allCpFiles.contains(moduleName) }.toSet()
+//
+//        if (absentCpFiles.isNotEmpty()) {
+//            generateClasspathFilesForModules(absentCpFiles, modulePathsMap)
+//        }
+//        val moduleClasspathMap = mutableMapOf<String, String>()
+//        val moduleChildren = mutableMapOf<String, Set<String>>()
+//
+//        srcModuleGroups.keys.forEach { moduleName ->
+//            val cpFilePath = "${input.greencatRoot}/$CLASSPATH_DIR/$moduleName".noTilda()
+//            val cpFile = File(cpFilePath)
+//
+//            if (!cpFile.exists()) {
+//                error("Classpath file doesn't exist: $cpFilePath")
+//            }
+//            val (classpath, children) = cpFile.readLines()
+//            moduleClasspathMap += moduleName to classpath
+//            moduleChildren += moduleName to children.split(":").toSet()
+//        }
+//        val moduleCompilationOrderMap = CompilationOrderResolver().getModulesCompilationOrder(moduleChildren)
+//        check(srcModuleGroups.size == moduleCompilationOrderMap.size) { "Missing some modules" }
+//
+//        moduleCompilationOrderMap.keys.forEach { moduleName ->
+//            checkNotNull(modulePathsMap[moduleName]) { "Module not found: $moduleName" }
+//        }
+//        return ProjectResolverOutput(
+//            sourceFilesMap = srcModuleGroups,
+//            moduleClasspathMap = moduleClasspathMap,
+//            moduleCompilationOrderMap = moduleCompilationOrderMap,
+//        )
+//
+//        return ProjectResolverOutput(
+//            sourceFilesMap = emptyMap(),
+//            moduleClasspathMap = emptyMap(),
+//            moduleCompilationOrderMap = emptyMap(),
+//        )
+//    }
 
     private fun generateClasspathFilesForModules(
         moduleNames: Set<String>,

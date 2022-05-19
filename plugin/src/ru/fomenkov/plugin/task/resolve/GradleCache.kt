@@ -1,4 +1,4 @@
-package ru.fomenkov.plugin.resolver
+package ru.fomenkov.plugin.task.resolve
 
 sealed class GradleCacheItem {
 

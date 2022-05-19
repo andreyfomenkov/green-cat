@@ -5,6 +5,7 @@ sealed class RepositoryResource {
     data class ClassResource(
         val packageName: String,
         val classFilePath: String,
+        val buildDirPath: String,
     ) : RepositoryResource()
 
     data class JarResource(

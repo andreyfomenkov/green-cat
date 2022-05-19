@@ -59,7 +59,11 @@ class ClassFileRepository : ResourceRepository<RepositoryResource.ClassResource>
 
         classFilePaths.forEach { path ->
             val packageName = getPackageName(moduleBuildPath, path)
-            val resource = RepositoryResource.ClassResource(packageName = packageName, classFilePath = path)
+            val resource = RepositoryResource.ClassResource(
+                packageName = packageName,
+                classFilePath = path,
+                buildDirPath = moduleBuildPath,
+            )
             output += packageName to resource
         }
     }
