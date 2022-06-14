@@ -13,7 +13,7 @@ import java.util.concurrent.Executors
 
 private const val GRADLE_PROPERTIES_FILE_NAME = "gradle.properties"
 private const val GRADLE_SETTINGS_FILE_NAME = "settings.gradle"
-private const val PLUGIN_VERSION = "1.6"
+private const val PLUGIN_VERSION = "2.0"
 private val cpuCount = Runtime.getRuntime().availableProcessors()
 private val executor = Executors.newFixedThreadPool(cpuCount)
 
@@ -32,7 +32,7 @@ fun main(args: Array<String>) = try {
 }
 
 private fun launch(args: Array<String>) {
-    val params = readParams(args) ?: return
+    val params = readParams(args) ?: throw IllegalArgumentException("No arguments provided")
     val projectResolverInput = ProjectResolverInput(
         propertiesFileName = GRADLE_PROPERTIES_FILE_NAME,
         settingsFileName = GRADLE_SETTINGS_FILE_NAME,
