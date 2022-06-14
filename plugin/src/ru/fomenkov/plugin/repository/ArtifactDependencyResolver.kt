@@ -19,14 +19,17 @@ class ArtifactDependencyResolver(
 
     fun resolvePaths(groupId: String, artifactId: String, version: String): Map<PomDescriptor, Set<String>> {
         val output = mutableMapOf<PomDescriptor, Set<String>>() // POM -> JAR/AAR paths
-        resolve(groupId, artifactId, version, 0, output)
+        try {
+            resolve(groupId, artifactId, version, 0, output)
 
-        output.forEach { (desc, _) ->
-            val paths = jetifiedJarRepository.getArtifactPaths(desc.artifactId, desc.version)
+            output.forEach { (desc, _) ->
+                val paths = jetifiedJarRepository.getArtifactPaths(desc.artifactId, desc.version)
 
-            if (paths.isNotEmpty()) {
-                output[desc] = paths
+                if (paths.isNotEmpty()) {
+                    output[desc] = paths
+                }
             }
+        } catch (_: Throwable) {
         }
         return output
     }

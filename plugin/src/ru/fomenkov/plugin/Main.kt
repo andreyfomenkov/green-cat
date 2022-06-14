@@ -1,13 +1,16 @@
 package ru.fomenkov.plugin
 
 import ru.fomenkov.plugin.params.Param
+import ru.fomenkov.plugin.params.PluginParams
 import ru.fomenkov.plugin.params.PluginParamsReader
 import ru.fomenkov.plugin.repository.ArtifactDependencyResolver
 import ru.fomenkov.plugin.repository.JetifiedJarRepository
 import ru.fomenkov.plugin.repository.parser.JetifiedResourceParser
 import ru.fomenkov.plugin.repository.parser.PomFileParser
+import ru.fomenkov.plugin.task.compile.CompileTask
 import ru.fomenkov.plugin.task.resolve.ProjectResolveTask
 import ru.fomenkov.plugin.task.resolve.ProjectResolverInput
+import ru.fomenkov.plugin.task.resolve.ProjectResolverOutput
 import ru.fomenkov.plugin.util.Telemetry
 import java.util.concurrent.Executors
 
@@ -33,7 +36,13 @@ fun main(args: Array<String>) = try {
 
 private fun launch(args: Array<String>) {
     val params = readParams(args) ?: throw IllegalArgumentException("No arguments provided")
-    val projectResolverInput = ProjectResolverInput(
+    val projectInfo = resolveProject(params)
+    compile(params, projectInfo)
+    Telemetry.log("DEX file successfully generated")
+}
+
+private fun resolveProject(params: PluginParams): ProjectResolverOutput {
+    val input = ProjectResolverInput(
         propertiesFileName = GRADLE_PROPERTIES_FILE_NAME,
         settingsFileName = GRADLE_SETTINGS_FILE_NAME,
         androidSdkPath = params.androidSdkRoot,
@@ -44,14 +53,16 @@ private fun launch(args: Array<String>) {
     val jetifiedResourceParser = JetifiedResourceParser()
     val jetifiedJarRepository = JetifiedJarRepository(jetifiedResourceParser)
     val artifactResolver = ArtifactDependencyResolver(jetifiedJarRepository, pomFileParser)
-    val projectInfo = ProjectResolveTask(projectResolverInput, artifactResolver, executor).run()
-//    CompileTask(
-//        greencatRoot = params.greencatRoot,
-//        androidSdkRoot = params.androidSdkRoot,
-//        projectInfo = projectInfo,
-//        executor = executor,
-//    ).run()
-    Telemetry.log("DEX file successfully generated")
+    return ProjectResolveTask(input, artifactResolver).run()
+}
+
+private fun compile(params: PluginParams, projectInfo: ProjectResolverOutput) {
+    CompileTask(
+        greencatRoot = params.greencatRoot,
+        androidSdkRoot = params.androidSdkRoot,
+        projectInfo = projectInfo,
+        executor = executor,
+    ).run()
 }
 
 private fun readParams(args: Array<String>) = when {
