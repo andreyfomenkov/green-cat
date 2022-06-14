@@ -444,7 +444,7 @@ class ProjectResolver(
         val getProjectDeps = { path: String ->
             checkNotNull(modules[path]) { "Module path $path not found" }
         }
-        val moduleDeps = checkNotNull(getProjectDeps(modulePath)) { "No deps for module path: $modulePath" }.toMutableSet()
+        val moduleDeps = getProjectDeps(modulePath).toMutableSet()
         val tempDeps = mutableSetOf<Dependency>()
         val resolvedModulePaths = mutableSetOf<String>()
         var hasUnresolvedProjects = true

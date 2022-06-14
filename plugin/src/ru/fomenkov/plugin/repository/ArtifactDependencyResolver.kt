@@ -7,17 +7,38 @@ import ru.fomenkov.plugin.util.exec
 import java.io.File
 import java.lang.StringBuilder
 
-class ArtifactDependencyResolver(private val pomFileParser: PomFileParser) {
-
+class ArtifactDependencyResolver(
+    private val jetifiedJarRepository: JetifiedJarRepository,
+    private val pomFileParser: PomFileParser,
+) {
     private val cacheDir = "/Users/andrey.fomenkov/.gradle/caches/modules-2/files-2.1" // TODO
 
-    fun resolvePaths(groupId: String, artifactId: String, version: String): Map<PomDescriptor, String> {
-        val output = mutableMapOf<PomDescriptor, String>() // POM -> jar or aar path
+    init {
+        jetifiedJarRepository.scan()
+    }
+
+    fun resolvePaths(groupId: String, artifactId: String, version: String): Map<PomDescriptor, Set<String>> {
+        val output = mutableMapOf<PomDescriptor, Set<String>>() // POM -> JAR/AAR paths
         resolve(groupId, artifactId, version, 0, output)
+
+        output.forEach { (desc, _) ->
+            val paths = jetifiedJarRepository.getArtifactPaths(desc.artifactId, desc.version)
+
+            if (paths.isNotEmpty()) {
+                output[desc] = paths
+            }
+        }
         return output
     }
 
-    private fun resolve(groupId: String, artifactId: String, version: String, level: Int, output: MutableMap<PomDescriptor, String>) {
+    private fun resolve(
+        groupId: String,
+        artifactId: String,
+        version: String,
+        level: Int,
+        output: MutableMap<PomDescriptor, Set<String>>,
+    ) {
+//        Telemetry.log("${spaces(level)}$groupId:$artifactId:$version")
         val descriptor = PomDescriptor(groupId, artifactId, version)
 
         if (descriptor in output) {
@@ -39,21 +60,20 @@ class ArtifactDependencyResolver(private val pomFileParser: PomFileParser) {
                 .filterNot { path -> path.endsWith("-sources.jar") }
                 .filterNot { path -> path.endsWith("-javadoc.jar") }
             val pom = when (pomPaths.size) {
-                0 -> return
+                0 -> null // No POM file can be found
                 1 -> pomFileParser.parse(pomPaths.first())
                 else -> error("Multiple POM files found at ${versionDir.absolutePath}")
             }
-            val archive = when (archivePaths.size) {
+            val archives = when (archivePaths.size) {
                 0 -> null
-                1 -> archivePaths.first()
-                else -> error("Multiple archives files found at ${versionDir.absolutePath}")
+                else -> archivePaths.toSet()
             }
-            if (archive == null) {
+            if (archives == null) {
                 Telemetry.err("No archives found at ${versionDir.absolutePath}")
             } else {
-                output += descriptor to archive
+                output += descriptor to archives
             }
-            pom.dependencies.forEach { dep ->
+            pom?.dependencies?.forEach { dep ->
                 if (dep.scope.isTransitive()) {
                     val artifactDir = getArtifactDir(dep.descriptor.groupId, dep.descriptor.artifactId)
 
@@ -87,7 +107,7 @@ class ArtifactDependencyResolver(private val pomFileParser: PomFileParser) {
             val builder = StringBuilder()
 
             for (i in 0 until level) {
-                builder.append("  ")
+                builder.append("-")
             }
             builder.toString()
         } else {

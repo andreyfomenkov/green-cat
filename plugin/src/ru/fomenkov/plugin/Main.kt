@@ -3,6 +3,8 @@ package ru.fomenkov.plugin
 import ru.fomenkov.plugin.params.Param
 import ru.fomenkov.plugin.params.PluginParamsReader
 import ru.fomenkov.plugin.repository.ArtifactDependencyResolver
+import ru.fomenkov.plugin.repository.JetifiedJarRepository
+import ru.fomenkov.plugin.repository.parser.JetifiedResourceParser
 import ru.fomenkov.plugin.repository.parser.PomFileParser
 import ru.fomenkov.plugin.task.resolve.ProjectResolveTask
 import ru.fomenkov.plugin.task.resolve.ProjectResolverInput
@@ -39,7 +41,9 @@ private fun launch(args: Array<String>) {
         mappedModules = params.mappedModules,
     )
     val pomFileParser = PomFileParser()
-    val artifactResolver = ArtifactDependencyResolver(pomFileParser)
+    val jetifiedResourceParser = JetifiedResourceParser()
+    val jetifiedJarRepository = JetifiedJarRepository(jetifiedResourceParser)
+    val artifactResolver = ArtifactDependencyResolver(jetifiedJarRepository, pomFileParser)
     val projectInfo = ProjectResolveTask(projectResolverInput, artifactResolver, executor).run()
 //    CompileTask(
 //        greencatRoot = params.greencatRoot,

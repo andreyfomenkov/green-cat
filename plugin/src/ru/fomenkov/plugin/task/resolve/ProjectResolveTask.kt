@@ -1,8 +1,10 @@
 package ru.fomenkov.plugin.task.resolve
 
 import ru.fomenkov.plugin.repository.ArtifactDependencyResolver
+import ru.fomenkov.plugin.repository.data.PomDescriptor
 import ru.fomenkov.plugin.resolver.Dependency
 import ru.fomenkov.plugin.resolver.ProjectResolver
+import ru.fomenkov.plugin.resolver.Relation
 import ru.fomenkov.plugin.task.Task
 import ru.fomenkov.plugin.util.*
 import ru.fomenkov.runner.CLASSPATH_DIR
@@ -20,15 +22,16 @@ class ProjectResolveTask(
         propertiesFileName = input.propertiesFileName,
         settingsFileName = input.settingsFileName,
     )
+    private val gradleProperties = mutableMapOf<String, String>()
+    private val modulePathsMap = mutableMapOf<String, String>()
 
     override fun run(): ProjectResolverOutput {
-        val modulePath = "odnoklassniki-profile"
+        val modulePath = "odnoklassniki-android"
         val moduleDeclarations = resolver.parseModuleDeclarations()
-        val modulePathsMap = moduleDeclarations.associate { dec -> dec.name to dec.path }
-        val gradleProperties = mutableMapOf<String, String>()
         val moduleDependencies = mutableMapOf<String, Set<Dependency>>()
 
         Telemetry.log("Project contains ${moduleDeclarations.size} modules")
+        modulePathsMap += moduleDeclarations.associate { dec -> dec.name to dec.path }
         gradleProperties += resolver.parseGradleProperties()
 
         moduleDeclarations.forEach { module ->
@@ -42,42 +45,136 @@ class ProjectResolveTask(
             modules = moduleDependencies,
             moduleNameToPath = modulePathsMap,
         )
-//        val placeholderVersions = resolver.validateAndResolveLibraryVersions(
-//            modulePath = modulePath,
-//            deps = moduleDependencies[modulePath]!!,
-//            properties = gradleProperties,
-//            moduleDeclarations = moduleDeclarations,
+        val classpath = getModuleClasspath(deps)
+
+        classpath.forEach { path ->
+            if (File(path).exists()) {
+                Telemetry.log("CLASSPATH: $path")
+            } else {
+                Telemetry.err("File doesn't exist: $path")
+            }
+        }
+        exec("rm -rf ~/out")
+
+//        val javaFiles = exec("find odnoklassniki-android/src -name '*.java'")
+//        val javaFiles = setOf(
+//            "odnoklassniki-android/src/ru/ok/android/statistics/stream/BannerStatisticsHandlerImpl.java",
+//            "odnoklassniki-android/src/ru/ok/android/ui/video/fragments/VideosShowCaseFragment.java",
+//            "odnoklassniki-android/src/ru/ok/android/ui/video/fragments/PlaybackSettingsSheet.java",
+//            "odnoklassniki-android/src/ru/ok/android/ui/video/navigation/LegacyOkVideoOpenHelper.java",
+//            "odnoklassniki-android/src/ru/ok/android/ui/video/player/cast/multiscreen/smartview/SmartView.java",
+//            "odnoklassniki-android/src/ru/ok/android/ui/video/player/cast/multiscreen/smartview/SmartViewDevice.java",
+//            "odnoklassniki-android/src/ru/ok/android/ui/video/player/cast/VideoMSCastManager.java",
 //        )
+        val javaFiles = setOf(
+            "odnoklassniki-android/src/ru/ok/android/ui/nativeRegistration/home/HomeFragment.java",
+            "odnoklassniki-android/src/ru/ok/android/ui/nativeRegistration/home/AuthorizedUserListFragment.java",
+        )
+        var prevCount = 0
 
-        deps.filterIsInstance(Dependency.Library::class.java).forEach { lib ->
-            var version = gradleProperties[lib.version]
+        javaFiles.forEachIndexed { index, file ->
+            val output = exec("javac -cp ${classpath.joinToString(separator = ":")} $file -d ~/out", print = true)
+            val currCount = exec("find ~/out -name '*.class' | wc -l").first().trim().toInt()
 
-            if (lib.version.isBlank()) {
-                version = "" // No version, choose the latest one from the Gradle cache
+            if (currCount == prevCount) {
+                Telemetry.err("[ERROR] $file")
+                output.forEach { line -> Telemetry.err("[ERROR] ${line.trim()}") }
+                Telemetry.log(" ")
+                exec("espeak 'compilation failed'")
+            } else {
+                Telemetry.log("[OK] ${index + 1}/${javaFiles.size}: $file")
 
-            } else if (version == null) {
-                // Probably it's a hardcoded version, not placeholder
-                if (lib.version[0].isDigit()) {
-                    version = lib.version
-                } else {
-                    error("Unresolved version or placeholder: ${lib.artifact}:${lib.version}")
+                if (index % 10 == 0) {
+                    exec("espeak '$currCount classes'")
                 }
             }
-            val parts = lib.artifact.split(":")
-            val groupId = parts.first()
-            val artifactId = parts.last()
-
-            Telemetry.log("LIB: $groupId:$artifactId:$version")
-
-            val resourcePaths = artifactResolver.resolvePaths(groupId, artifactId, version)
-            Telemetry.log(" - ${resourcePaths.size} paths")
+            prevCount = currCount
         }
+        exec("espeak 'testing complete'")
 
         return ProjectResolverOutput(
             sourceFilesMap = emptyMap(),
             moduleClasspathMap = emptyMap(),
             moduleCompilationOrderMap = emptyMap(),
         )
+    }
+
+    private fun getModuleClasspath(deps: Set<Dependency>): Set<String> {
+        val classpath = mutableSetOf<String>()
+        val foo = mutableListOf<String>() // TODO: remove!
+
+        // TODO: add module itself!
+        val mod = Dependency.Project(moduleName = "odnoklassniki-android", relation = Relation.IMPLEMENTATION)
+        // TODO
+
+        (deps + mod).forEach { dep ->
+            when (dep) {
+                is Dependency.Project -> {
+                    foo += "PROJECT: ${dep.moduleName} (${dep.relation})"
+                    val modulePath = modulePathsMap[dep.moduleName] ?: throw RuntimeException("No module path for ${dep.moduleName}")
+                    val buildPath = "$CURRENT_DIR/$modulePath/build"
+
+                    // All build subdirectories
+                    "$buildPath/intermediates/javac/debug/classes".apply { if (File(this).exists()) classpath += this }
+                    "$buildPath/intermediates/javac/debugAndroidTest/classes".apply { if (File(this).exists()) classpath += this }
+                    "$buildPath/intermediates/compile_r_class_jar/debug/R.jar".apply { if (File(this).exists()) classpath += this }
+                    "$buildPath/intermediates/compile_and_runtime_not_namespaced_r_class_jar/debug/R.jar".apply { if (File(this).exists()) classpath += this }
+                    "$buildPath/tmp/kotlin-classes/debug".apply { if (File(this).exists()) classpath += this }
+                    "$buildPath/tmp/kapt3/classes/debug".apply { if (File(this).exists()) classpath += this }
+                    "$buildPath/generated/res/resValues/debug".apply { if (File(this).exists()) classpath += this }
+                    "$buildPath/generated/res/rs/debug".apply { if (File(this).exists()) classpath += this }
+                    "$buildPath/generated/crashlytics/res/debug".apply { if (File(this).exists()) classpath += this }
+                    "$buildPath/generated/res/google-services/debug".apply { if (File(this).exists()) classpath += this }
+                    "$buildPath/classes/java/main".apply { if (File(this).exists()) classpath += this }
+                    "$buildPath/classes/java/debug".apply { if (File(this).exists()) classpath += this }
+                    // TODO: other subdirectories?
+                }
+                is Dependency.Library -> {
+                    val allPaths = getLibraryPaths(dep)
+                    foo += "LIB: ${dep.artifact}:${dep.version} (${dep.relation})"
+                    allPaths.forEach { (desc, _) -> foo += "   LIB: ${desc.groupId}:${desc.artifactId}:${desc.version} (${dep.relation})" }
+                    allPaths.values.forEach { paths -> classpath += paths }
+                }
+                is Dependency.Files -> {
+                    foo += "FILE: ${dep.filePath} (${dep.relation})"
+                    classpath += "${dep.modulePath}/${dep.filePath}"
+                }
+            }
+        }
+        // Android SDK
+        classpath += "/Users/andrey.fomenkov/Library/Android/sdk//platforms/android-30/android.jar"
+        classpath += "/Users/andrey.fomenkov/Library/Android/sdk//platforms/android-30/data/res"
+
+        // FOO
+//        foo.sort()
+        foo.forEach { dep -> Telemetry.log(dep) }
+        return classpath
+    }
+
+    private fun getLibraryPaths(lib: Dependency.Library): Map<PomDescriptor, Set<String>> {
+        var version = gradleProperties[lib.version]
+
+        if (lib.version.isBlank()) {
+            version = "" // No version, choose the latest one from the Gradle cache
+
+        } else if (version == null) {
+            if (lib.version[0].isDigit()) { // Probably it's a hardcoded version, not placeholder
+                version = lib.version
+            } else {
+                error("Unresolved version or placeholder: ${lib.artifact}:${lib.version}")
+            }
+        }
+        val parts = lib.artifact.split(":")
+        val groupId = parts.first()
+        val artifactId = parts.last()
+        val resourcePaths = try {
+            // TODO: optimize library classpath - no recursive resolution for non-transitive dependency
+            artifactResolver.resolvePaths(groupId, artifactId, version)
+        } catch (error: Throwable) {
+            // TODO: refactor
+            emptyMap()
+        }
+        return resourcePaths
     }
 
 //    override fun run(): ProjectResolverOutput {
