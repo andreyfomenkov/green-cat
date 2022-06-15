@@ -3,7 +3,6 @@ package ru.fomenkov.plugin.repository
 import ru.fomenkov.plugin.repository.data.PomDescriptor
 import ru.fomenkov.plugin.repository.parser.PomFileParser
 import ru.fomenkov.plugin.util.Telemetry
-import ru.fomenkov.plugin.util.exec
 import java.io.File
 import java.lang.StringBuilder
 
@@ -12,16 +11,15 @@ class ArtifactDependencyResolver(
     private val pomFileParser: PomFileParser,
 ) {
     private val cacheDir = "/Users/andrey.fomenkov/.gradle/caches/modules-2/files-2.1" // TODO
+    private val output = mutableMapOf<PomDescriptor, Set<String>>() // POM -> JAR/AAR paths
 
     init {
         jetifiedJarRepository.scan()
     }
 
     fun resolvePaths(groupId: String, artifactId: String, version: String): Map<PomDescriptor, Set<String>> {
-        val output = mutableMapOf<PomDescriptor, Set<String>>() // POM -> JAR/AAR paths
         try {
-            resolve(groupId, artifactId, version, 0, output)
-
+            resolve(groupId, artifactId, version, 0)
             output.forEach { (desc, _) ->
                 val paths = jetifiedJarRepository.getArtifactPaths(desc.artifactId, desc.version)
 
@@ -29,21 +27,14 @@ class ArtifactDependencyResolver(
                     output[desc] = paths
                 }
             }
-        } catch (_: Throwable) {
+        } catch (error: Throwable) {
+            Telemetry.verboseErr("Failed to resolve paths (message = ${error.localizedMessage})")
         }
         return output
     }
 
-    private fun resolve(
-        groupId: String,
-        artifactId: String,
-        version: String,
-        level: Int,
-        output: MutableMap<PomDescriptor, Set<String>>,
-    ) {
-//        Telemetry.log("${spaces(level)}$groupId:$artifactId:$version")
+    private fun resolve(groupId: String, artifactId: String, version: String, level: Int) {
         val descriptor = PomDescriptor(groupId, artifactId, version)
-
         if (descriptor in output) {
             return
         }
@@ -56,7 +47,7 @@ class ArtifactDependencyResolver(
             versionDir = File(getVersionDir(groupId, artifactId, latestVersion))
         }
         if (versionDir.exists()) {
-            val resources = exec("find ${versionDir.absolutePath}")
+            val resources = listVersionDirResources(versionDir.absolutePath)
             val pomPaths = resources.filter { path -> path.endsWith(".pom") }
             val archivePaths = resources
                 .filter { path -> path.endsWith(".jar") || path.endsWith(".aar") }
@@ -72,7 +63,7 @@ class ArtifactDependencyResolver(
                 else -> archivePaths.toSet()
             }
             if (archives == null) {
-                Telemetry.err("No archives found at ${versionDir.absolutePath}")
+                Telemetry.verboseErr("No archives found at ${versionDir.absolutePath}")
             } else {
                 output += descriptor to archives
             }
@@ -83,16 +74,26 @@ class ArtifactDependencyResolver(
                     if (File(artifactDir).exists()) {
                         val allVersions = File(artifactDir).list { file, _ -> file.isDirectory } ?: emptyArray()
                         val latestVersion = getLatestVersion(artifactDir, allVersions)
-                        resolve(dep.descriptor.groupId, dep.descriptor.artifactId, latestVersion, level + 1, output)
+                        resolve(dep.descriptor.groupId, dep.descriptor.artifactId, latestVersion, level + 1)
                     } else {
-                        Telemetry.err("No artifact directory: $artifactDir")
+                        Telemetry.verboseErr("No artifact directory: $artifactDir")
                     }
                 }
             }
-            // TODO: jar, aar
         } else {
             error("No artifact directory: ${versionDir.absolutePath}")
         }
+    }
+
+    private fun listVersionDirResources(path: String): List<String> {
+        val resources = mutableListOf<String>()
+        val hashDirs = File(path).list { file, _ -> file.isDirectory } ?: emptyArray()
+        hashDirs.forEach { hashDir ->
+            resources += File("$path/$hashDir")
+                .listFiles()
+                ?.map { file -> file.absolutePath } ?: emptyList()
+        }
+        return resources
     }
 
     private fun getVersionDir(groupId: String, artifactId: String, version: String) = "$cacheDir/$groupId/$artifactId/$version"

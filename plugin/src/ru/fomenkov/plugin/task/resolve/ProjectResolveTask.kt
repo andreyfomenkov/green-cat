@@ -58,7 +58,7 @@ class ProjectResolveTask(
             Telemetry.log("")
         }
         Telemetry.log("Project contains ${moduleDeclarations.size} module(s)")
-        Telemetry.log("Resolving project dependencies...\n")
+        Telemetry.log("Resolving dependencies...\n")
 
         val cpDir = "${input.greencatRoot}/$CLASSPATH_DIR".noTilda()
         val allCpFiles = File(cpDir).listFiles(File::isFile)?.map(File::getName)?.toSet() ?: emptySet()

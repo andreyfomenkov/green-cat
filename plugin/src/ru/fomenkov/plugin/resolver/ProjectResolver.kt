@@ -436,8 +436,8 @@ class ProjectResolver(
         val getModulePathByName = { name: String ->
             val path = moduleNameToPath[name]
             if (path == null) {
-                // May occur when dependency inside try-catch block
-                Telemetry.err("No module path for name: $name")
+                // May occur for dependencies inside try-catch block
+                Telemetry.verboseErr("No module path for name: $name")
             }
             path
         }
