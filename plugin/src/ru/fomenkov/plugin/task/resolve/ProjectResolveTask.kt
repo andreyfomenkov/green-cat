@@ -50,7 +50,7 @@ class ProjectResolveTask(
             Telemetry.log("")
         }
         if (input.mappedModules.isNotEmpty()) {
-            Telemetry.log("Module mappings:\n")
+            Telemetry.log("Mapped modules:\n")
 
             input.mappedModules.forEach { (moduleFrom, moduleTo) ->
                 Telemetry.log(" - [$moduleFrom] => [$moduleTo]")

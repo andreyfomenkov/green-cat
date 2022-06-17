@@ -49,6 +49,8 @@ private fun launch(args: Array<String>): RunnerParams? {
         return null
 
     } else {
+        checkSingleAndroidDeviceConnected()
+        checkApplicationStoragePermissions(params)
         val supported = checkGitDiff() ?: return null
         syncWithMainframer(params, supported)
         pluginUpdater.checkForUpdate(params, forceCheck = false)
@@ -58,6 +60,45 @@ private fun launch(args: Array<String>): RunnerParams? {
         displayTotalTime = true
         return params
     }
+}
+
+private fun checkSingleAndroidDeviceConnected() {
+    val devices = exec("adb devices")
+        .map { line -> line.trim() }
+        .filter { line -> line.endsWith("device") }
+        .map { line -> line.substring(0, line.length - 6).trim() }
+
+    when (devices.size) {
+        0 -> error("No Android devices connected")
+        1 -> Telemetry.log("Device '${devices.first()}' connected")
+        else -> error("Multiple devices connected")
+    }
+}
+
+private fun checkApplicationStoragePermissions(params: RunnerParams) {
+    val packageName = when (val mode = params.mode) {
+        is RunnerMode.UiTest -> {
+            mode.appPackage
+        }
+        is RunnerMode.Debug -> {
+            mode.componentName.split("/").first()
+        }
+        else -> error("Unexpected runner mode: ${params.mode}")
+    }
+    val output = exec("adb shell dumpsys package $packageName | grep -i $READ_EXTERNAL_STORAGE_PERMISSION")
+        .map { line -> line.lowercase().replace(" ", "") }
+
+    if (output.isEmpty()) {
+        error("No package '$packageName' installed")
+    }
+    output.forEach { line ->
+        if (line.contains("granted=true")) {
+            return
+        } else if (line.contains("granted=false")) {
+            error("Package '$packageName' has no external storage permission")
+        }
+    }
+    error("Unable to check storage permissions for package '$packageName'")
 }
 
 private fun restartApplication(params: RunnerParams) {
@@ -229,4 +270,5 @@ const val ANDROID_DEVICE_DEX_DIR = "/data/local/tmp"
 const val OUTPUT_DEX_FILE = "patch.dex"
 const val PLUGIN_UPDATE_TIMESTAMP_FILE = "greencat_update"
 const val COMPILER_UPDATE_TIMESTAMP_FILE = "compiler_update"
+const val READ_EXTERNAL_STORAGE_PERMISSION = "android.permission.READ_EXTERNAL_STORAGE"
 val CHECK_UPDATE_INTERVAL = TimeUnit.HOURS.toMillis(1)
