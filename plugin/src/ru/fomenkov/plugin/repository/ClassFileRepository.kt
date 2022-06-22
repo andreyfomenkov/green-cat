@@ -14,10 +14,16 @@ class ClassFileRepository : ResourceRepository<RepositoryResource.ClassResource>
 
     private val buildDirs = listOf( // TODO
         "build/intermediates/javac/debug/classes",
-        "build/classes/java/main",
-        "build/classes/kotlin/main",
+        "build/intermediates/javac/debugAndroidTest/classes",
         "build/tmp/kotlin-classes/debug",
         "build/tmp/kotlin-classes/main",
+        "build/tmp/kapt3/classes/debug",
+        "build/generated/res/resValues/debug",
+        "build/generated/res/rs/debug",
+        "build/generated/crashlytics/res/debug",
+        "build/generated/res/google-services/debug",
+        "build/classes/java/main",
+        "build/classes/java/debug",
     )
 
     override fun scan() {

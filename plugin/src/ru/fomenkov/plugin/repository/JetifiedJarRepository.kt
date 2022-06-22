@@ -2,6 +2,7 @@ package ru.fomenkov.plugin.repository
 
 import ru.fomenkov.plugin.repository.parser.JetifiedResourceParser
 import ru.fomenkov.plugin.util.Telemetry
+import ru.fomenkov.plugin.util.noTilda
 import ru.fomenkov.plugin.util.timeMillis
 import java.io.File
 import java.util.concurrent.CountDownLatch
@@ -11,8 +12,15 @@ class JetifiedJarRepository(
     private val parser: JetifiedResourceParser,
 ) : JarRepository() {
 
+    private val cacheDir = "~/.gradle/caches/transforms-3".noTilda() // TODO: search between transforms-X
     private val artifactVersions = mutableMapOf<String, Set<String>>() // artifact ID -> available versions
     private val artifactPaths = mutableMapOf<Entry, Set<String>>() // artifact entry -> available JARs and AARs
+
+    init {
+        if (!File(cacheDir).exists()) {
+            error("Gradle cache path doesn't exist: $cacheDir")
+        }
+    }
 
     fun getAvailableVersions(artifactId: String) = artifactVersions[artifactId] ?: emptySet()
 
@@ -27,7 +35,7 @@ class JetifiedJarRepository(
         val allResources = mutableSetOf<String>()
 
         val time = timeMillis {
-            val files = File("/Users/andrey.fomenkov/.gradle/caches/transforms-3").listFiles()!! // TODO
+            val files = File(cacheDir).listFiles()!! // TODO
             val latch = CountDownLatch(files.size)
 
             files.forEach { dir ->

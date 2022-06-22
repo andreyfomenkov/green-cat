@@ -30,3 +30,11 @@ fun timeMillis(action: () -> Unit): Long {
 }
 
 fun isFileSupported(path: String) = path.trim().endsWith(".java") || path.trim().endsWith(".kt")
+
+fun getApiLevel(): Int? {
+    val output = exec("adb shell getprop ro.build.version.sdk")
+    if (output.isEmpty()) {
+        return null
+    }
+    return output.first().toIntOrNull()
+}

@@ -60,6 +60,7 @@ private fun compile(params: PluginParams, projectInfo: ProjectResolverOutput) {
     CompileTask(
         greencatRoot = params.greencatRoot,
         androidSdkRoot = params.androidSdkRoot,
+        deviceApiLevel = params.deviceApiLevel,
         projectInfo = projectInfo,
         executor = executor,
     ).run()

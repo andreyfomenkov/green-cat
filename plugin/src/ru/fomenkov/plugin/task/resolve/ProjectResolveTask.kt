@@ -124,6 +124,7 @@ class ProjectResolveTask(
 
             // All build subdirectories
             getBuildSubDirectories(buildPath).forEach { path -> path.toClasspath() }
+
             // Local lib directory if any
             File("$modulePath/libs").apply {
                 if (exists()) {
@@ -164,6 +165,7 @@ class ProjectResolveTask(
         "$buildPath/intermediates/compile_r_class_jar/debug/R.jar", // TODO: find 'compile_*' directories
         "$buildPath/intermediates/compile_and_runtime_not_namespaced_r_class_jar/debug/R.jar",
         "$buildPath/tmp/kotlin-classes/debug",
+        "$buildPath/tmp/kotlin-classes/main",
         "$buildPath/tmp/kapt3/classes/debug",
         "$buildPath/generated/res/resValues/debug",
         "$buildPath/generated/res/rs/debug",
@@ -171,6 +173,8 @@ class ProjectResolveTask(
         "$buildPath/generated/res/google-services/debug",
         "$buildPath/classes/java/main",
         "$buildPath/classes/java/debug",
+        "$buildPath/classes/kotlin/main",
+        "$buildPath/classes/kotlin/debug",
     )
 
     private fun getLibraryPaths(lib: Dependency.Library): Map<PomDescriptor, Set<String>> {

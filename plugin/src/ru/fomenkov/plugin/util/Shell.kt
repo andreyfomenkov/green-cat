@@ -29,7 +29,9 @@ fun exec(cmd: String, print: Boolean = false): List<String> {
             }
         }
         return output
+
     } catch (error: Throwable) {
-        throw RuntimeException("Failed to execute command: $cmd", error)
+        Telemetry.err("Failed to execute shell command: $cmd\nError: ${error.message}")
+        return emptyList()
     }
 }

@@ -21,6 +21,7 @@ class PluginParamsReader(
             androidSdkRoot = value(Param.ANDROID_SDK_ROOT),
             greencatRoot = value(Param.GREENCAT_ROOT),
             mappedModules = splitToMappedModules(keyMap[Param.MAPPED_MODULES.key]),
+            deviceApiLevel = value(Param.DEVICE_API_LEVEL),
         )
     }
 

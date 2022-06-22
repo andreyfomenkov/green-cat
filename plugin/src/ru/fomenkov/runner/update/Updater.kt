@@ -1,10 +1,10 @@
 package ru.fomenkov.runner.update
 
 import ru.fomenkov.plugin.util.exec
-import ru.fomenkov.runner.CHECK_UPDATE_INTERVAL
 import ru.fomenkov.runner.logger.Log
 import ru.fomenkov.runner.params.RunnerParams
 import java.io.File
+import java.util.concurrent.TimeUnit
 import kotlin.math.abs
 
 abstract class Updater(
@@ -51,4 +51,8 @@ abstract class Updater(
     }
 
     abstract fun checkForUpdate(params: RunnerParams, forceCheck: Boolean)
+
+    private companion object {
+        val CHECK_UPDATE_INTERVAL = TimeUnit.HOURS.toMillis(1)
+    }
 }

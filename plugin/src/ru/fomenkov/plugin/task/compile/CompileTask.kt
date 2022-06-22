@@ -5,12 +5,12 @@ import ru.fomenkov.plugin.task.resolve.ProjectResolverOutput
 import ru.fomenkov.plugin.util.*
 import ru.fomenkov.runner.*
 import java.io.File
-import java.lang.StringBuilder
 import java.util.concurrent.*
 
 class CompileTask(
     private val greencatRoot: String,
     private val androidSdkRoot: String,
+    private val deviceApiLevel: String,
     private val projectInfo: ProjectResolverOutput,
     private val executor: ExecutorService,
 ) : Task<Unit> {
@@ -38,13 +38,11 @@ class CompileTask(
                 val moduleClasspath = checkNotNull(projectInfo.moduleClasspathMap[moduleName]) {
                     "No classpath for module $moduleName"
                 }
-                val greencatClassDir = "$greencatRoot/$CLASS_FILES_DIR"
                 val javaSrcFiles = srcFiles.filter { path -> path.endsWith(".java") }.toSet()
                 val kotlinSrcFiles = srcFiles.filter { path -> path.endsWith(".kt") }.toSet()
-                val classpath = when (File(greencatClassDir).exists()) {
-                    true -> "$greencatClassDir:$moduleClasspath"
-                    else -> moduleClasspath
-                }
+                val greencatClassDirs = getGreenCatClassDirectories(greencatRoot)
+                val classpath = greencatClassDirs.joinToString(separator = ":") + ":$moduleClasspath"
+
                 Callable {
                     val result = when (javaSrcFiles.isEmpty()) {
                         true -> CompilationResult.Successful
@@ -70,7 +68,16 @@ class CompileTask(
                 }
             }
         }
-        runD8(moduleClasspathMap = projectInfo.moduleClasspathMap)
+        runD8()
+    }
+
+    private fun getGreenCatClassDirectories(greencatRoot: String): Set<String> {
+        val files = File("$greencatRoot/$CLASS_FILES_DIR")
+            .listFiles { file, _ -> file.isDirectory } ?: emptyArray()
+
+        return files.map { file ->
+            Telemetry.log("CP: ${file.absolutePath}")
+            file.absolutePath }.toSet()
     }
 
     private fun deleteClasspathForModule(moduleName: String) {
@@ -122,94 +129,87 @@ class CompileTask(
     private fun getFriendModulePaths(moduleName: String, moduleClasspath: String) =
         moduleClasspath.split(":").filter { path -> path.contains("$moduleName/build") }
 
-    private fun runD8(moduleClasspathMap: Map<String, String>) {
+    private fun runD8() {
         val buildToolsDir = getBuildToolsDir()
         val d8ToolPath = "$buildToolsDir/d8"
+        val dexDumpToolPath = "$buildToolsDir/dexdump"
         val classDir = "$greencatRoot/$CLASS_FILES_DIR".noTilda()
         val moduleDirs = File(classDir).list { file, _ -> file.isDirectory } ?: emptyArray()
         val dexDir = "$greencatRoot/$DEX_FILES_DIR".noTilda()
-        check(moduleDirs.isNotEmpty()) { "Class directory is empty" }
-
-        // TODO: parallel
-        moduleDirs.forEach { moduleDir ->
-            val classpath = checkNotNull(moduleClasspathMap[moduleDir]) { "No classpath for module: $moduleDir" }
-            val outDir = File("$dexDir/$moduleDir")
-            val dirs = exec("find $classDir/$moduleDir -name '*.class'").map { path ->
-                "${File(path).parentFile.absolutePath}/*.class"
-            }.toSet()
-
-            if (!outDir.exists()) {
-                outDir.mkdir()
-            }
-            val cpBuilder = StringBuilder()
-            val time = timeMillis {
-                classpath.split(":")
-                    .filterNot { path -> path.endsWith(".aar") }
-//                    .filterNot { path -> path.endsWith(".jar") }
-                    .forEach { path -> cpBuilder.append("--classpath $path ") }
-
-
-                exec("$d8ToolPath ${dirs.joinToString(separator = " ")} --intermediate --output ${outDir.absolutePath}")
-//                    .forEach { line -> Telemetry.log("D8: ${line.trim()}") }
-            }
-            Telemetry.log("D8 time = ${formatMillis(time)}")
+        val standardDexFileName = "classes.dex"
+        val dexFilePath = "$dexDir/$OUTPUT_DEX_FILE".noTilda()
+        val currentApiLevel = try {
+            deviceApiLevel.toInt()
+        } catch (_: Throwable) {
+            error("Failed to parse device API level: $deviceApiLevel")
         }
+        val minApiLevelArg = if (currentApiLevel >= MIN_API_LEVEL) {
+            "--min-api $MIN_API_LEVEL"
+        } else {
+            ""
+        }
+        check(moduleDirs.isNotEmpty()) { "Class directory is empty" }
+        Telemetry.log("Running D8 (API level: $deviceApiLevel)...")
 
+        val tasks = moduleDirs.map { moduleDir ->
+            val task = Callable {
+                val outDir = File("$dexDir/$moduleDir")
+                val classDirs = exec("find $classDir/$moduleDir -name '*.class'")
+                    .map { path -> "${File(path).parentFile.absolutePath}/*.class" }
+                    .toSet()
+                    .joinToString(separator = " ")
 
-//        val dexFilePath = "$dexDir/$OUTPUT_DEX_FILE".noTilda()
-//        val dexDumpToolPath = "$buildToolsDir/dexdump"
-//
-//        if (File(dexFilePath).exists()) {
-//            error("DEX file is not cleared")
-//        }
-//        val allDirs = exec("find $classDir -type d")
-//        val classDirs = mutableSetOf<String>()
-//
-//        if (allDirs.isEmpty()) {
-//            error("No subdirectories found")
-//        }
-//        allDirs.forEach { dir ->
-//            val files = File(dir).list() ?: emptyArray()
-//            val hasClassFiles = files.firstOrNull { file -> file.endsWith(".class") } != null
-//
-//            if (hasClassFiles) {
-//                classDirs += "$dir/*.class"
-//            }
-//        }
-//        if (classDirs.isEmpty()) {
-//            error("No subdirectories with class files found")
-//        }
-//        val inputDirs = classDirs.joinToString(separator = " ")
-//        val buildDirs = mutableSetOf<String>()
-//        buildDirs += classDir // TODO: refactor
-//        buildDirs += paths
+                if (!outDir.exists()) {
+                    outDir.mkdir()
+                }
+                exec("$d8ToolPath $classDirs --file-per-class --output ${outDir.absolutePath} $minApiLevelArg")
+                    .forEach { line -> Telemetry.log("[$moduleDir] D8: ${line.trim()}") }
+                exec("find ${outDir.absolutePath} -name '*.dex'").isNotEmpty()
+            }
+            executor.submit(task)
+        }
+        tasks.forEach { future ->
+            val isOk = try {
+                future.get()
+            } catch (error: Throwable) {
+                error("Error running D8 (message = ${error.message})")
+            }
+            if (!isOk) {
+                error("Error running D8")
+            }
+        }
+        val dexFiles = exec("find $dexDir -name '*.dex'")
 
-//        val classpath = buildDirs.joinToString(separator = " --classpath ")
-//        val output = exec("$d8ToolPath $inputDirs --output --intermediate $dexDir --classpath /home/andrey.fomenkov/mainframer/ok/odnoklassniki-stream-engine/build/intermediates/javac/debug/classes")
-//        val entries = exec("$dexDumpToolPath $dexDir/$standardDexFileName | grep 'Class descriptor'")
-//        Telemetry.log("Output DEX file contains ${entries.size} class entries:\n")
+        if (dexFiles.isEmpty()) {
+            error("No DEX files found")
+        }
+        val dexFilesArg = dexFiles.joinToString(separator = " ") { path -> "'$path'" }
 
-//        entries.forEach { line ->
-//            val startIndex = line.indexOfFirst { c -> c == '\'' }
-//            val endIndex = line.indexOfLast { c -> c == ';' }
-//
-//            if (startIndex == -1 || endIndex == -1) {
-//                error("Failed to parse dexdump output")
-//            }
-//            Telemetry.log(" # ${line.substring(startIndex + 1, endIndex)}")
-//            Telemetry.log(" # $line")
-//        }
-//        Telemetry.log("")
-//
-//        File("$dexDir/$standardDexFileName").apply {
-//            if (!exists()) {
-//                output.forEach { line -> Telemetry.err("[D8] $line") }
-//                error("Failed to generate output DEX file: $path")
-//            }
-//            if (!renameTo(File(dexFilePath))) {
-//                error("Failed to rename: $path -> $dexFilePath")
-//            }
-//        }
+        exec("$d8ToolPath $dexFilesArg --output $dexDir $minApiLevelArg")
+            .forEach { line -> Telemetry.log("Merge D8: ${line.trim()}") }
+
+        val entries = exec("$dexDumpToolPath $dexDir/$standardDexFileName | grep 'Class descriptor'")
+        Telemetry.log("\nOutput DEX file contains ${entries.size} class entries:\n")
+
+        entries.forEach { line ->
+            val startIndex = line.indexOfFirst { c -> c == '\'' }
+            val endIndex = line.indexOfLast { c -> c == ';' }
+
+            if (startIndex == -1 || endIndex == -1) {
+                error("Failed to parse dexdump output")
+            }
+            Telemetry.log(" # ${line.substring(startIndex + 1, endIndex)}")
+        }
+        Telemetry.log("")
+
+        File("$dexDir/$standardDexFileName").apply {
+            if (!exists()) {
+                error("Failed to generate output DEX file: $path")
+            }
+            if (!renameTo(File(dexFilePath))) {
+                error("Failed to rename: $path -> $dexFilePath")
+            }
+        }
     }
 
     private fun getBuildToolsDir() = File("$androidSdkRoot/build-tools").run {
@@ -241,5 +241,12 @@ class CompileTask(
         object Successful : CompilationResult()
 
         data class Error(val moduleName: String, val output: List<String>) : CompilationResult()
+    }
+
+    private companion object {
+        // Min API level, when there are no warnings about missing types for desugaring. Specifying types in D8
+        // classpath fixes the problem, but slows down build
+        // TODO: need research about desugaring
+        const val MIN_API_LEVEL = 24
     }
 }

@@ -3,6 +3,7 @@ package ru.fomenkov.plugin.repository
 import ru.fomenkov.plugin.repository.data.PomDescriptor
 import ru.fomenkov.plugin.repository.parser.PomFileParser
 import ru.fomenkov.plugin.util.Telemetry
+import ru.fomenkov.plugin.util.noTilda
 import java.io.File
 import java.lang.StringBuilder
 
@@ -10,10 +11,13 @@ class ArtifactDependencyResolver(
     private val jetifiedJarRepository: JetifiedJarRepository,
     private val pomFileParser: PomFileParser,
 ) {
-    private val cacheDir = "/Users/andrey.fomenkov/.gradle/caches/modules-2/files-2.1" // TODO
+    private val cacheDir = "~/.gradle/caches/modules-2/files-2.1".noTilda() // TODO: search between modules-X
     private val output = mutableMapOf<PomDescriptor, Set<String>>() // POM -> JAR/AAR paths
 
     init {
+        if (!File(cacheDir).exists()) {
+            error("Gradle cache path doesn't exist: $cacheDir")
+        }
         jetifiedJarRepository.scan()
     }
 

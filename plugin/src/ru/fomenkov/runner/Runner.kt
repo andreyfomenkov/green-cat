@@ -26,9 +26,13 @@ fun main(args: Array<String>) {
         params?.apply(::restartApplication)
 
     } catch (error: Throwable) {
+        // Wait and show error message at the end, because System.out and System.err
+        // streams are not mutually synchronized
+        Thread.sleep(FINAL_ERROR_MESSAGE_DELAY)
+
         when (error.message.isNullOrBlank()) {
-            true -> Log.e("Process execution failed")
-            else -> Log.e("Process execution failed. ${error.message}")
+            true -> Log.e("\n# Process execution failed #")
+            else -> Log.e("\n# Process execution failed: ${error.message} #")
         }
     }
 }
@@ -70,7 +74,7 @@ private fun checkSingleAndroidDeviceConnected() {
 
     when (devices.size) {
         0 -> error("No Android devices connected")
-        1 -> Telemetry.log("Device '${devices.first()}' connected")
+        1 -> Telemetry.log("Device '${devices.first()}' connected (API ${getApiLevel()})")
         else -> error("Multiple devices connected")
     }
 }
@@ -156,12 +160,18 @@ private fun displayTotalTime(time: Long) {
 private fun startGreenCatPlugin(params: RunnerParams) {
     val greencatJar = "${params.greencatRoot}/$GREENCAT_JAR"
     val version = ssh { cmd("java -jar $greencatJar -v") }.firstOrNull() ?: "???"
+    val apiLevel = getApiLevel() ?: 0
     Log.d("Launching GreenCat v$version on the remote host. It may take a while...")
 
     val mappedModulesParam = formatMappedModulesParameter(params.modulesMap)
-    ssh(print = true) {
+    val lines = ssh(print = true) {
         cmd("cd ${params.projectRoot}")
-        cmd("java -jar $greencatJar -s ${params.androidSdkRoot} -g ${params.greencatRoot} $mappedModulesParam")
+        cmd("java -jar $greencatJar -s ${params.androidSdkRoot} -g ${params.greencatRoot} $mappedModulesParam -l $apiLevel")
+    }
+    lines.forEach { line ->
+        if (line.trim().startsWith("Build failed:")) {
+            error("error running plugin")
+        }
     }
 }
 
@@ -271,4 +281,4 @@ const val OUTPUT_DEX_FILE = "patch.dex"
 const val PLUGIN_UPDATE_TIMESTAMP_FILE = "greencat_update"
 const val COMPILER_UPDATE_TIMESTAMP_FILE = "compiler_update"
 const val READ_EXTERNAL_STORAGE_PERMISSION = "android.permission.READ_EXTERNAL_STORAGE"
-val CHECK_UPDATE_INTERVAL = TimeUnit.HOURS.toMillis(1)
+const val FINAL_ERROR_MESSAGE_DELAY = 100L
