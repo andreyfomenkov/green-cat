@@ -1,6 +1,7 @@
 package ru.fomenkov.plugin.task.resolve
 
 import ru.fomenkov.plugin.repository.ArtifactDependencyResolver
+import ru.fomenkov.plugin.repository.ClasspathOptimizer
 import ru.fomenkov.plugin.repository.data.PomDescriptor
 import ru.fomenkov.plugin.resolver.Dependency
 import ru.fomenkov.plugin.resolver.ModuleDeclaration
@@ -21,6 +22,7 @@ class ProjectResolveTask(
         propertiesFileName = input.propertiesFileName,
         settingsFileName = input.settingsFileName,
     )
+    private val classpathOptimizer = ClasspathOptimizer()
     private val moduleDeclarations = mutableSetOf<ModuleDeclaration>()
     private val gradleProperties = mutableMapOf<String, String>()
     private val modulePathsMap = mutableMapOf<String, String>()
@@ -155,7 +157,7 @@ class ProjectResolveTask(
             "${platformDir.absolutePath}/android.jar".toClasspath()
             "${platformDir.absolutePath}/data/res".toClasspath()
         }
-        return classpath to children
+        return classpathOptimizer.optimize(classpath) to children
     }
 
     // TODO: other subdirectories?
@@ -203,6 +205,7 @@ class ProjectResolveTask(
      * Line 2: child modules, including transitive, separated with ":"
      */
     private fun generateClasspathFile(moduleName: String) {
+        var length = 0
         val time = timeMillis {
             val modulePath = checkNotNull(modulePathsMap[moduleName]) { "No path for module: $moduleName" }
             val moduleDependencies = mutableMapOf<String, Set<Dependency>>()
@@ -224,9 +227,10 @@ class ProjectResolveTask(
                 append("${classpath.joinToString(separator = ":")}\n") // Line 1: module classpath
                 append(children.joinToString(separator = ":"))         // Line 2: child modules
             }
+            length = classpath.size
             File(classpathFilePath).writeText(content.toString())
         }
-        Telemetry.log("Generating classpath for '$moduleName' takes ${formatMillis(time)}")
+        Telemetry.log("Generating classpath for '$moduleName' takes ${formatMillis(time)} (length = $length)")
     }
 
     private fun getSourceFileModuleName(sourceFile: String): String {

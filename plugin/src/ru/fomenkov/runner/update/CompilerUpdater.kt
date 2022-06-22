@@ -18,26 +18,26 @@ class CompilerUpdater(
         ssh { cmd("mkdir -p ${params.greencatRoot}") }
 
         fun downloadUpdate(version: String, artifactUrl: String) {
-            Log.d("[Compiler] Downloading update...")
+            Log.d("[Compiler] Downloading update... ", newLine = false)
             ssh { cmd("rm -rf ${params.greencatRoot}/$KOTLINC_DIR") }
             ssh { cmd("cd ${params.greencatRoot} && curl -s $artifactUrl > $archiveFile && unzip $archiveFile && rm $archiveFile") }
             ssh { cmd("cd ${params.greencatRoot}/$KOTLINC_DIR && echo \"$version\" > $KOTLINC_VERSION_FILE") }
 
             val isUpdated = ssh { cmd("ls ${params.greencatRoot}/$KOTLINC_DIR/bin/kotlinc && echo OK") }.find { line -> line.trim() == "OK" } != null
             when {
-                isUpdated -> Log.d("[Compiler] Done")
+                isUpdated -> Log.d("Done")
                 else -> error("Error updating compiler on the remote host")
             }
         }
         if (exists) {
             if (forceCheck || isNeedToCheckVersion()) {
-                Log.d("[Compiler] Checking for update...")
+                Log.d("[Compiler] Checking for update... ", newLine = false)
 
                 val curVersion = ssh { cmd("head -1 $remoteCompilerDateFile") }.firstOrNull()?.trim() ?: ""
                 val (updVersion, artifactUrl) = getVersionInfo()
 
                 if (curVersion == updVersion) {
-                    Log.d("[Compiler] Everything is up to date")
+                    Log.d("Everything is up to date")
                 } else {
                     downloadUpdate(updVersion, artifactUrl)
                 }

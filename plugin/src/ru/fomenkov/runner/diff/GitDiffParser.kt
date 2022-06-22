@@ -21,7 +21,7 @@ class GitDiffParser {
                     untracked = true
                 }
                 if (untracked) {
-                    if (!line.contains("(") && !line.contains("\"") && !line.contains(":")) {
+                    if (!line.contains("(") && !line.contains("\"") && !line.contains(":") && !line.trim().contains(" ")) {
                         when (line.trim().endsWith("/")) {
                             true -> {
                                 paths += exec("find ${line.trim()}")

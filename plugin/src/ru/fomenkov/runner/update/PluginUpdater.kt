@@ -18,7 +18,7 @@ class PluginUpdater(
         ssh { cmd("mkdir -p ${params.greencatRoot}") }
 
         fun downloadUpdate(version: String, artifactUrl: String) {
-            Log.d("[Plugin] Downloading update...")
+            Log.d("[Plugin] Downloading update... ", newLine = false)
             val tmpDir = exec("echo \$TMPDIR").firstOrNull() ?: ""
 
             check(tmpDir.isNotBlank()) { "Unable to get /tmp directory" }
@@ -39,19 +39,19 @@ class PluginUpdater(
             val isUpdated = ssh { cmd("ls $remoteJarPath && echo OK") }.find { line -> line.trim() == "OK" } != null
 
             when {
-                isUpdated -> Log.d("[Plugin] Done. GreenCat updated to v$version")
+                isUpdated -> Log.d("Done. GreenCat updated to v$version")
                 else -> error("Error uploading $GREENCAT_JAR to the remote host")
             }
         }
         if (exists) {
             if (forceCheck || isNeedToCheckVersion()) {
-                Log.d("[Plugin] Checking for update...")
+                Log.d("[Plugin] Checking for update... ", newLine = false)
 
                 val curVersion = ssh { cmd("java -jar $remoteJarPath -v") }.firstOrNull()?.trim() ?: ""
                 val (updVersion, artifactUrl) = getVersionInfo()
 
                 if (curVersion == updVersion) {
-                    Log.d("[Plugin] Everything is up to date")
+                    Log.d("Everything is up to date")
                 } else {
                     downloadUpdate(updVersion, artifactUrl)
                 }
