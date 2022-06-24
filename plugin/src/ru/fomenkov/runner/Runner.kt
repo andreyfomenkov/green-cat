@@ -178,11 +178,8 @@ private fun startGreenCatPlugin(params: RunnerParams) {
 private fun checkGitDiff(): List<String>? {
     Log.d("Checking diff...")
     val gitDiffParser = GitDiffParser()
-    val diff = try {
-        gitDiffParser.parse()
-    } catch (_: Throwable) {
-        gitDiffParser.parse() // Second attempt to fix "It took ... seconds to enumerate untracked files" git error
-    }
+    val diff = gitDiffParser.parse()
+
     Log.d("On branch: ${diff.branch}")
     val (supported, ignored) = diff.paths.partition { path -> isFileSupported(path) }
 

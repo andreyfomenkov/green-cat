@@ -18,7 +18,7 @@ class PluginUpdater(
         ssh { cmd("mkdir -p ${params.greencatRoot}") }
 
         fun downloadUpdate(version: String, artifactUrl: String) {
-            Log.d("[Plugin] Downloading update... ", newLine = false)
+            Log.d("Downloading update... ", newLine = false)
             val tmpDir = exec("echo \$TMPDIR").firstOrNull() ?: ""
 
             check(tmpDir.isNotBlank()) { "Unable to get /tmp directory" }
