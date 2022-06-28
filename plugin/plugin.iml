@@ -27,5 +27,6 @@
       </library>
     </orderEntry>
     <orderEntry type="library" name="google.code.gson" level="application" />
+    <orderEntry type="library" name="mixpanel.java" level="application" />
   </component>
 </module>

@@ -17,6 +17,7 @@ private var displayTotalTime = false
 
 fun main(args: Array<String>) {
     try {
+        Mixpanel.launch()
         var params: RunnerParams? = null
         val time = timeMillis { params = launch(args) }
 
@@ -24,11 +25,13 @@ fun main(args: Array<String>) {
             displayTotalTime(time)
         }
         params?.apply(::restartApplication)
+        Mixpanel.complete(duration = time)
 
     } catch (error: Throwable) {
         // Wait and show error message at the end, because System.out and System.err
         // streams are not mutually synchronized
         Thread.sleep(FINAL_ERROR_MESSAGE_DELAY)
+        Mixpanel.failed(message = error.message ?: "")
 
         when (error.message.isNullOrBlank()) {
             true -> Log.e("\n# Process execution failed #")
