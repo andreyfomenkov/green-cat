@@ -22,7 +22,6 @@ object Mixpanel {
 
     private val messageBuilder = MessageBuilder(PROJECT_TOKEN)
     private val mixpanel = MixpanelAPI()
-    private val userId = getUserId()
 
     fun launch() {
         deliver(EVENT_LAUNCH)
@@ -45,13 +44,11 @@ object Mixpanel {
     private fun deliver(eventName: String, props: JSONObject? = null) {
         try {
             val delivery = ClientDelivery()
-            val message = messageBuilder.event(userId, eventName, props)
+            val message = messageBuilder.event(DISTINCT_ID, eventName, props)
             delivery.addMessage(message)
             mixpanel.deliver(delivery)
         } catch (error: IOException) {
             Telemetry.err("Failed to deliver event: ${error.message}")
         }
     }
-
-    private fun getUserId() = CURRENT_DIR.noTilda().split("/")[2]
 }

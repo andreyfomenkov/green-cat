@@ -21,7 +21,7 @@ class ArtifactDependencyResolver(
         jetifiedJarRepository.scan()
     }
 
-    fun resolvePaths(groupId: String, artifactId: String, version: String): Map<PomDescriptor, Set<String>> {
+    fun resolvePaths(groupId: String, artifactId: String, version: String): Set<String> {
         try {
             resolve(groupId, artifactId, version, 0)
             output.forEach { (desc, _) ->
@@ -34,7 +34,9 @@ class ArtifactDependencyResolver(
         } catch (error: Throwable) {
             Telemetry.verboseErr("Failed to resolve paths (message = ${error.localizedMessage})")
         }
-        return output
+        val result = mutableSetOf<String>()
+        output.values.forEach { paths -> result += paths }
+        return result
     }
 
     private fun resolve(groupId: String, artifactId: String, version: String, level: Int) {

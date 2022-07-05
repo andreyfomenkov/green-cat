@@ -2,21 +2,34 @@ package ru.fomenkov.plugin.repository
 
 import org.junit.jupiter.api.Test
 import ru.fomenkov.plugin.repository.parser.JetifiedResourceParser
-import ru.fomenkov.plugin.repository.parser.PomFileParser
+import ru.fomenkov.plugin.repository.parser.MetadataDescriptionParser
+import ru.fomenkov.plugin.util.Telemetry
+import ru.fomenkov.plugin.util.exec
 
-// Playground. Remove then
+// Playground
 class ArtifactDependencyResolverTest {
 
     @Test
     fun test() {
         val jetifiedResourceParser = JetifiedResourceParser()
-        val repository = JetifiedJarRepository(jetifiedResourceParser)
-        val pomFileParser = PomFileParser()
-        val resolver = ArtifactDependencyResolver(repository, pomFileParser)
+        val jetifiedJarRepository = JetifiedJarRepository(jetifiedResourceParser)
+        val descriptionParser = MetadataDescriptionParser()
+        val resolver = MetadataArtifactDependencyResolver(jetifiedJarRepository, descriptionParser)
 
-        // androidx.core:core-ktx:1.1.0 -> 1.6.0
-        // org.jetbrains.kotlin/kotlin-stdlib/1.6.10
-        // org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.5.31 -> 1.6.10
-        resolver.resolvePaths("org.jetbrains.kotlin", "kotlin-stdlib-jdk8", "1.6.10")
+        exec("find ~/.gradle/caches/modules-2/metadata-2.97 -name 'descriptor.bin'")
+            .map { path ->
+                val parts = path.split("/")
+                val groupId = parts[parts.size - 5]
+                val artifact = parts[parts.size - 4]
+                val version = parts[parts.size - 3]
+                MetadataDescriptionParser.Artifact(groupId, artifact, version)
+            }
+            .toSet()
+            .forEach { artifact ->
+                val paths = resolver.resolvePaths(artifact.groupId, artifact.artifactId, artifact.version)
+
+                Telemetry.log("\n$artifact (${paths.size}) paths")
+                paths.forEach { path -> Telemetry.log(" - $path") }
+            }
     }
 }

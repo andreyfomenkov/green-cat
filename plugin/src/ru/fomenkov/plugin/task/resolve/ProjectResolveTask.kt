@@ -1,8 +1,7 @@
 package ru.fomenkov.plugin.task.resolve
 
-import ru.fomenkov.plugin.repository.ArtifactDependencyResolver
 import ru.fomenkov.plugin.repository.ClasspathOptimizer
-import ru.fomenkov.plugin.repository.data.PomDescriptor
+import ru.fomenkov.plugin.repository.MetadataArtifactDependencyResolver
 import ru.fomenkov.plugin.resolver.Dependency
 import ru.fomenkov.plugin.resolver.ModuleDeclaration
 import ru.fomenkov.plugin.resolver.ProjectResolver
@@ -15,7 +14,7 @@ import java.io.File
 
 class ProjectResolveTask(
     private val input: ProjectResolverInput,
-    private val artifactResolver: ArtifactDependencyResolver,
+    private val artifactResolver: MetadataArtifactDependencyResolver,
 ) : Task<ProjectResolverOutput> {
 
     private val resolver = ProjectResolver(
@@ -136,9 +135,7 @@ class ProjectResolveTask(
             children += dep.moduleName
         }
         libs.forEach { dep ->
-            getLibraryPaths(dep).values.forEach { paths ->
-                paths.forEach { path -> path.toClasspath() }
-            }
+            getLibraryPaths(dep).forEach { path -> path.toClasspath() }
         }
         files.forEach { dep ->
             "${dep.modulePath}/${dep.filePath}".toClasspath()
@@ -179,7 +176,7 @@ class ProjectResolveTask(
         "$buildPath/classes/kotlin/debug",
     )
 
-    private fun getLibraryPaths(lib: Dependency.Library): Map<PomDescriptor, Set<String>> {
+    private fun getLibraryPaths(lib: Dependency.Library): Set<String> {
         var version = gradleProperties[lib.version]
 
         if (lib.version.isBlank()) {

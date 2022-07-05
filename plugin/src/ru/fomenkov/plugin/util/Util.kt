@@ -3,6 +3,7 @@ package ru.fomenkov.plugin.util
 import java.io.File
 
 val CURRENT_DIR: String = File("").absolutePath
+val DISTINCT_ID = CURRENT_DIR.noTilda().split("/")[2]
 val HOME_DIR: String = exec("echo ~").firstOrNull().let { path ->
     when {
         path.isNullOrBlank() -> error("Failed to get home directory")

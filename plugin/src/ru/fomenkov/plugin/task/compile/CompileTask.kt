@@ -76,7 +76,6 @@ class CompileTask(
             .listFiles { file, _ -> file.isDirectory } ?: emptyArray()
 
         return files.map { file ->
-            Telemetry.log("CP: ${file.absolutePath}")
             file.absolutePath }.toSet()
     }
 

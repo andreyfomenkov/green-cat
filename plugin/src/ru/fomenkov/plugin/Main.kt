@@ -3,10 +3,10 @@ package ru.fomenkov.plugin
 import ru.fomenkov.plugin.params.Param
 import ru.fomenkov.plugin.params.PluginParams
 import ru.fomenkov.plugin.params.PluginParamsReader
-import ru.fomenkov.plugin.repository.ArtifactDependencyResolver
 import ru.fomenkov.plugin.repository.JetifiedJarRepository
+import ru.fomenkov.plugin.repository.MetadataArtifactDependencyResolver
 import ru.fomenkov.plugin.repository.parser.JetifiedResourceParser
-import ru.fomenkov.plugin.repository.parser.PomFileParser
+import ru.fomenkov.plugin.repository.parser.MetadataDescriptionParser
 import ru.fomenkov.plugin.task.compile.CompileTask
 import ru.fomenkov.plugin.task.resolve.ProjectResolveTask
 import ru.fomenkov.plugin.task.resolve.ProjectResolverInput
@@ -49,10 +49,10 @@ private fun resolveProject(params: PluginParams): ProjectResolverOutput {
         greencatRoot = params.greencatRoot,
         mappedModules = params.mappedModules,
     )
-    val pomFileParser = PomFileParser()
     val jetifiedResourceParser = JetifiedResourceParser()
     val jetifiedJarRepository = JetifiedJarRepository(jetifiedResourceParser)
-    val artifactResolver = ArtifactDependencyResolver(jetifiedJarRepository, pomFileParser)
+    val metadataDescriptionParser = MetadataDescriptionParser()
+    val artifactResolver = MetadataArtifactDependencyResolver(jetifiedJarRepository, metadataDescriptionParser)
     return ProjectResolveTask(input, artifactResolver).run()
 }
 
