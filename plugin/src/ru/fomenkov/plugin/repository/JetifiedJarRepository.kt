@@ -71,7 +71,25 @@ class JetifiedJarRepository(
             executor.shutdown()
             parseArtifactPaths(allResources)
         }
+        optimizePaths()
         Telemetry.log("Scan jetified JAR files: $time ms")
+    }
+
+    // AAR for a particular artifact already contains JAR => keep JAR, remove AAR
+    private fun optimizePaths() {
+        val optimizedPaths = mutableMapOf<Entry, Set<String>>()
+
+        artifactPaths.forEach { (entry, paths) ->
+            val classesJar = paths.firstOrNull { path -> path.endsWith("/classes.jar") }
+
+            if (classesJar == null) {
+                optimizedPaths[entry] = paths
+            } else {
+                optimizedPaths[entry] = setOf(classesJar)
+            }
+        }
+        artifactPaths.clear()
+        artifactPaths += optimizedPaths
     }
 
     private fun parseArtifactPaths(allPaths: Set<String>) {
