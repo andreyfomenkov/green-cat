@@ -61,6 +61,7 @@ private fun compile(params: PluginParams, projectInfo: ProjectResolverOutput) {
         greencatRoot = params.greencatRoot,
         androidSdkRoot = params.androidSdkRoot,
         deviceApiLevel = params.deviceApiLevel,
+        mappedModules = params.mappedModules,
         projectInfo = projectInfo,
         executor = executor,
     ).run()

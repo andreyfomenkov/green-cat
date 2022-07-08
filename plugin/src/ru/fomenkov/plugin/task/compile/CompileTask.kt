@@ -11,9 +11,14 @@ class CompileTask(
     private val greencatRoot: String,
     private val androidSdkRoot: String,
     private val deviceApiLevel: String,
+    private val mappedModules: Map<String, String>,
     private val projectInfo: ProjectResolverOutput,
     private val executor: ExecutorService,
 ) : Task<Unit> {
+
+    // For debugging purposes. Find all source files in the module and compile one by one
+    private val debugCompileModule = false
+    private val debugModuleName = ""
 
     override fun run() {
         clearDirectory(CLASS_FILES_DIR)
@@ -29,54 +34,110 @@ class CompileTask(
             val modules = checkNotNull(orderMap[order]) {
                 "No modules for compilation order $order"
             }
-            Telemetry.log("Compilation round ${order + 1}/${orderMap.size}: ${modules.joinToString(separator = ", ")}")
+            if (debugCompileModule) {
+                compileModuleForDebug(debugModuleName)
+            } else {
+                Telemetry.log("Compilation round ${order + 1}/${orderMap.size}: ${modules.joinToString(separator = ", ")}")
+                val tasks = modules.map { moduleName -> compile(moduleName) }
 
-            val tasks = modules.map { moduleName ->
-                val srcFiles = checkNotNull(projectInfo.sourceFilesMap[moduleName]) {
-                    "No source files for module $moduleName"
-                }
-                val moduleClasspath = checkNotNull(projectInfo.moduleClasspathMap[moduleName]) {
-                    "No classpath for module $moduleName"
-                }
-                val javaSrcFiles = srcFiles.filter { path -> path.endsWith(".java") }.toSet()
-                val kotlinSrcFiles = srcFiles.filter { path -> path.endsWith(".kt") }.toSet()
-                val greencatClassDirs = getGreenCatClassDirectories(greencatRoot)
-                val classpath = greencatClassDirs.joinToString(separator = ":") + ":$moduleClasspath"
+                tasks.forEach { task ->
+                    val result = task.get()
 
-                Callable {
-                    val result = when (javaSrcFiles.isEmpty()) {
-                        true -> CompilationResult.Successful
-                        else -> compileWithJavac(srcFiles = javaSrcFiles, moduleName = moduleName, moduleClasspath = classpath)
-                    }
                     if (result is CompilationResult.Error) {
-                        result
-                    } else {
-                        when (kotlinSrcFiles.isEmpty()) {
-                            true -> CompilationResult.Successful
-                            else -> compileWithKotlin(srcFiles = kotlinSrcFiles, moduleName = moduleName, moduleClasspath = classpath)
-                        }
+                        result.output.forEach { line -> Telemetry.err(line) }
+                        deleteClasspathForModule(result.moduleName)
+                        error("Failed to compile module ${result.moduleName}")
                     }
-                }.run { executor.submit(this) }
-            }
-            tasks.forEach { task ->
-                val result = task.get()
-
-                if (result is CompilationResult.Error) {
-                    result.output.forEach { line -> Telemetry.err(line) }
-                    deleteClasspathForModule(result.moduleName)
-                    error("Failed to compile module ${result.moduleName}")
                 }
             }
         }
-        runD8()
+        if (!debugCompileModule) {
+            runD8()
+        }
+    }
+
+    private fun compileModuleForDebug(moduleName: String) {
+        var moduleClasspathFile = File("$greencatRoot/$CLASSPATH_DIR/$moduleName")
+        val modulePath = "$CURRENT_DIR/$moduleName"
+
+        var moduleClasspath = projectInfo.moduleClasspathMap[moduleName]
+
+        if (moduleClasspath == null) {
+            val mappedModuleName = mappedModules[moduleName]
+            moduleClasspath = projectInfo.moduleClasspathMap[mappedModuleName]
+            moduleClasspathFile = File("$greencatRoot/$CLASSPATH_DIR/$mappedModuleName")
+            checkNotNull(moduleClasspath) { "No classpath for module $moduleName" }
+        }
+        if (moduleClasspathFile.exists()) {
+            Telemetry.log("\n# Starting debug compilation for module $moduleName ($modulePath) #")
+        } else {
+            error("No classpath file for module $moduleName")
+        }
+        val javaFilePaths = exec("find $modulePath -name '*.java'")
+            .filterNot { path -> path.contains("/build/") }
+
+        val kotlinFilePaths = exec("find $modulePath -name '*.kt'")
+            .filterNot { path -> path.contains("/build/") }
+
+        val allSourcePaths = javaFilePaths + kotlinFilePaths
+        val greencatClassDirs = getGreenCatClassDirectories(greencatRoot)
+        val classpath = greencatClassDirs.joinToString(separator = ":") + ":$moduleClasspath"
+
+        Telemetry.log("Total: ${javaFilePaths.size} Java file(s) and ${kotlinFilePaths.size} Kotlin file(s)\n")
+        Telemetry.log("Classpath size = ${moduleClasspath.length}")
+
+        allSourcePaths.forEachIndexed { index, path ->
+            val result = when {
+                path.endsWith(".java") -> compileWithJavac(setOf(path), moduleName, classpath)
+                path.endsWith(".kt") -> compileWithKotlin(setOf(path), moduleName, classpath)
+                else -> null
+            }
+            when (result) {
+                is CompilationResult.Successful -> {
+                    Telemetry.log("[${index + 1} / ${allSourcePaths.size}] $path is OK")
+                }
+                is CompilationResult.Error -> {
+                    Telemetry.log("\n[${index + 1} / ${allSourcePaths.size}] $path is FAILED")
+                    result.output.forEach { line -> Telemetry.log(" # $line") }
+                    Telemetry.log("\n")
+                }
+                else -> Telemetry.log("[${index + 1} / ${allSourcePaths.size}] $path SKIPPED")
+            }
+        }
+    }
+
+    private fun compile(moduleName: String): Future<CompilationResult> {
+        val srcFiles = checkNotNull(projectInfo.sourceFilesMap[moduleName]) {
+            "No source files for module $moduleName"
+        }
+        val moduleClasspath = checkNotNull(projectInfo.moduleClasspathMap[moduleName]) {
+            "No classpath for module $moduleName"
+        }
+        val javaSrcFiles = srcFiles.filter { path -> path.endsWith(".java") }.toSet()
+        val kotlinSrcFiles = srcFiles.filter { path -> path.endsWith(".kt") }.toSet()
+        val greencatClassDirs = getGreenCatClassDirectories(greencatRoot)
+        val classpath = greencatClassDirs.joinToString(separator = ":") + ":$moduleClasspath"
+
+        return Callable {
+            val result = when (javaSrcFiles.isEmpty()) {
+                true -> CompilationResult.Successful
+                else -> compileWithJavac(srcFiles = javaSrcFiles, moduleName = moduleName, moduleClasspath = classpath)
+            }
+            if (result is CompilationResult.Error) {
+                result
+            } else {
+                when (kotlinSrcFiles.isEmpty()) {
+                    true -> CompilationResult.Successful
+                    else -> compileWithKotlin(srcFiles = kotlinSrcFiles, moduleName = moduleName, moduleClasspath = classpath)
+                }
+            }
+        }.run { executor.submit(this) }
     }
 
     private fun getGreenCatClassDirectories(greencatRoot: String): Set<String> {
         val files = File("$greencatRoot/$CLASS_FILES_DIR")
             .listFiles { file, _ -> file.isDirectory } ?: emptyArray()
-
-        return files.map { file ->
-            file.absolutePath }.toSet()
+        return files.map { file -> file.absolutePath }.toSet()
     }
 
     private fun deleteClasspathForModule(moduleName: String) {
