@@ -16,7 +16,7 @@ import java.util.concurrent.Executors
 
 private const val GRADLE_PROPERTIES_FILE_NAME = "gradle.properties"
 private const val GRADLE_SETTINGS_FILE_NAME = "settings.gradle"
-private const val PLUGIN_VERSION = "2.0"
+private const val PLUGIN_VERSION = "2.1"
 private val cpuCount = Runtime.getRuntime().availableProcessors()
 private val executor = Executors.newFixedThreadPool(cpuCount)
 
@@ -36,8 +36,13 @@ fun main(args: Array<String>) = try {
 
 private fun launch(args: Array<String>) {
     val params = readParams(args) ?: throw IllegalArgumentException("No arguments provided")
-    val projectInfo = resolveProject(params)
-    compile(params, projectInfo)
+    try {
+        compile(params, resolveProject(params), showErrorLogs = false)
+    } catch (_: Throwable) {
+        // Second attempt. May be useful when classpath is invalid -> rebuild classpath and try once again
+        Telemetry.log("Module classpath may be invalid -> rebuild & try once again")
+        compile(params, resolveProject(params), showErrorLogs = true)
+    }
     Telemetry.log("DEX file successfully generated")
 }
 
@@ -56,7 +61,7 @@ private fun resolveProject(params: PluginParams): ProjectResolverOutput {
     return ProjectResolveTask(input, artifactResolver).run()
 }
 
-private fun compile(params: PluginParams, projectInfo: ProjectResolverOutput) {
+private fun compile(params: PluginParams, projectInfo: ProjectResolverOutput, showErrorLogs: Boolean) {
     CompileTask(
         greencatRoot = params.greencatRoot,
         androidSdkRoot = params.androidSdkRoot,
@@ -64,6 +69,7 @@ private fun compile(params: PluginParams, projectInfo: ProjectResolverOutput) {
         mappedModules = params.mappedModules,
         projectInfo = projectInfo,
         executor = executor,
+        showErrorLogs = showErrorLogs,
     ).run()
 }
 

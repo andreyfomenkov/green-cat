@@ -14,6 +14,7 @@ class CompileTask(
     private val mappedModules: Map<String, String>,
     private val projectInfo: ProjectResolverOutput,
     private val executor: ExecutorService,
+    private val showErrorLogs: Boolean,
 ) : Task<Unit> {
 
     // For debugging purposes. Find all source files in the module and compile one by one
@@ -44,7 +45,9 @@ class CompileTask(
                     val result = task.get()
 
                     if (result is CompilationResult.Error) {
-                        result.output.forEach { line -> Telemetry.err(line) }
+                        if (showErrorLogs) {
+                            result.output.forEach { line -> Telemetry.err(line) }
+                        }
                         deleteClasspathForModule(result.moduleName)
                         error("Failed to compile module ${result.moduleName}")
                     }
