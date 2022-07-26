@@ -11,9 +11,14 @@ import ru.fomenkov.runner.ssh.ssh
 import ru.fomenkov.runner.update.CompilerUpdater
 import ru.fomenkov.runner.update.PluginUpdater
 import java.io.File
-import java.util.concurrent.TimeUnit
+import java.util.concurrent.Callable
+import java.util.concurrent.Executors
+import java.util.concurrent.Future
+
+private val uiTestTaskExecutor = Executors.newSingleThreadExecutor()
 
 private var displayTotalTime = false
+private var uiTestTask: Future<List<String>>? = null
 
 fun main(args: Array<String>) {
     try {
@@ -27,6 +32,14 @@ fun main(args: Array<String>) {
         params?.apply(::restartApplication)
         Mixpanel.complete(duration = time)
 
+        uiTestTask?.run {
+            val uiTestOutput = try {
+                get()
+            } catch (e: Throwable) {
+                error("Failed to get UI test output (message = ${e.localizedMessage})")
+            }
+            uiTestOutput.forEach(Telemetry::log)
+        }
     } catch (error: Throwable) {
         // Wait and show error message at the end, because System.out and System.err
         // streams are not mutually synchronized
@@ -37,6 +50,8 @@ fun main(args: Array<String>) {
             true -> Log.e("\n# Process execution failed #")
             else -> Log.e("\n# Process execution failed: ${error.message} #")
         }
+    } finally {
+        uiTestTaskExecutor.shutdown()
     }
 }
 
@@ -50,6 +65,15 @@ private fun launch(args: Array<String>): RunnerParams? {
     val params = readParams(args) ?: return null
     setRemoteHost(host = params.sshHost)
 
+    if (params.mode is RunnerMode.UiTest) {
+        val testClass = params.mode.testClass
+        val testRunner = params.mode.testRunner
+        val callable = Callable { exec("adb shell am instrument -w -m -e waitPatch $WAIT_PATCH_DELAY -e debug false -e class '$testClass' $testRunner") }
+
+        Log.d("Prelaunching UI test $testClass...")
+        Log.d("Patch waiting timeout: ${WAIT_PATCH_DELAY / 1000L} sec\n")
+        uiTestTask = uiTestTaskExecutor.submit(callable)
+    }
     if (params.mode == RunnerMode.Update) {
         pluginUpdater.checkForUpdate(params, forceCheck = true)
         compilerUpdated.checkForUpdate(params, forceCheck = true)
@@ -121,12 +145,7 @@ private fun restartApplication(params: RunnerParams) {
             exec("adb shell am start -n $componentName -a $action -c $category")
         }
         is RunnerMode.UiTest -> {
-            val testClass = params.mode.testClass
-            val testRunner = params.mode.testRunner
-            Log.d("\nLaunching UI test $testClass...")
-
-            val output = exec("adb shell am instrument -w -m -e debug false -e class '$testClass' $testRunner")
-            output.forEach(Telemetry::log)
+            // NOP, prelaunching on start
         }
         else -> {
             // NOP
@@ -282,3 +301,4 @@ const val PLUGIN_UPDATE_TIMESTAMP_FILE = "greencat_update"
 const val COMPILER_UPDATE_TIMESTAMP_FILE = "compiler_update"
 const val READ_EXTERNAL_STORAGE_PERMISSION = "android.permission.READ_EXTERNAL_STORAGE"
 const val FINAL_ERROR_MESSAGE_DELAY = 100L
+const val WAIT_PATCH_DELAY = 60000L
