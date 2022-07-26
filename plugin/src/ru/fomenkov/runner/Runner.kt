@@ -31,7 +31,6 @@ fun main(args: Array<String>) {
         }
         params?.apply(::restartApplication)
         Mixpanel.complete(duration = time)
-
         uiTestTask?.run {
             val uiTestOutput = try {
                 get()
@@ -82,7 +81,12 @@ private fun launch(args: Array<String>): RunnerParams? {
     } else {
         checkSingleAndroidDeviceConnected()
         checkApplicationStoragePermissions(params)
-        val supported = checkGitDiff() ?: return null
+        val supported = checkGitDiff()
+
+        if (supported == null) {
+            Runtime.getRuntime().exit(0)
+            return null
+        }
         syncWithMainframer(params, supported)
         pluginUpdater.checkForUpdate(params, forceCheck = false)
         compilerUpdated.checkForUpdate(params, forceCheck = false)
