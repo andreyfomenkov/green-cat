@@ -15,6 +15,7 @@ object Mixpanel {
     private const val EVENT_LAUNCH = "launch"
     private const val EVENT_COMPLETE = "complete"
     private const val EVENT_FAILED = "failed"
+    private const val EVENT_DROP = "drop"
 
     // Keys
     private const val KEY_DURATION = "duration"
@@ -39,6 +40,13 @@ object Mixpanel {
             put(KEY_MESSAGE, message)
         }
         deliver(EVENT_FAILED, props)
+    }
+
+    fun drop(message: String) {
+        val props = JSONObject().apply {
+            put(KEY_MESSAGE, message)
+        }
+        deliver(EVENT_DROP, props)
     }
 
     private fun deliver(eventName: String, props: JSONObject? = null) {

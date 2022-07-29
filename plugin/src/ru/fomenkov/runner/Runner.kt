@@ -194,10 +194,16 @@ private fun startGreenCatPlugin(params: RunnerParams) {
         cmd("cd ${params.projectRoot}")
         cmd("java -jar $greencatJar -s ${params.androidSdkRoot} -g ${params.greencatRoot} $mappedModulesParam -l $apiLevel")
     }
-    lines.forEach { line ->
-        if (line.trim().startsWith("Build failed:")) {
-            error("error running plugin")
-        }
+    val errorMessages = mutableSetOf<String>()
+    lines
+        .map(String::trim)
+        .forEach { line ->
+            if (line.startsWith("Build failed:") || line.startsWith("Error")) {
+                errorMessages += line.take(ERROR_MESSAGE_LENGTH_LIMIT)
+            }
+    }
+    if (errorMessages.isNotEmpty()) {
+        error(errorMessages.joinToString(separator = " / "))
     }
 }
 
@@ -211,6 +217,7 @@ private fun checkGitDiff(): List<String>? {
 
     if (supported.isEmpty() && ignored.isEmpty()) {
         Log.d("Nothing to compile")
+        Mixpanel.drop("Nothing to compile")
         return null
     }
     if (supported.isNotEmpty()) {
@@ -223,6 +230,7 @@ private fun checkGitDiff(): List<String>? {
     }
     if (supported.isEmpty()) {
         Log.d("\nNo supported changes to compile")
+        Mixpanel.drop("No supported changes to compile")
         return null
     }
     return supported
@@ -306,3 +314,4 @@ const val COMPILER_UPDATE_TIMESTAMP_FILE = "compiler_update"
 const val READ_EXTERNAL_STORAGE_PERMISSION = "android.permission.READ_EXTERNAL_STORAGE"
 const val FINAL_ERROR_MESSAGE_DELAY = 100L
 const val WAIT_PATCH_DELAY = 60000L
+const val ERROR_MESSAGE_LENGTH_LIMIT = 150
