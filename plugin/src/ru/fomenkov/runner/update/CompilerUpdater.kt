@@ -1,10 +1,13 @@
 package ru.fomenkov.runner.update
 
+import ru.fomenkov.plugin.util.exec
+import ru.fomenkov.runner.GREENCAT_JAR
 import ru.fomenkov.runner.KOTLINC_DIR
 import ru.fomenkov.runner.KOTLINC_VERSION_FILE
 import ru.fomenkov.runner.logger.Log
 import ru.fomenkov.runner.params.RunnerParams
 import ru.fomenkov.runner.ssh.ssh
+import java.io.File
 
 class CompilerUpdater(
     updateTimestampFile: String,
@@ -12,15 +15,28 @@ class CompilerUpdater(
 ) : Updater(updateTimestampFile, artifactVersionInfoUrl) {
 
     override fun checkForUpdate(params: RunnerParams, forceCheck: Boolean) {
-        val remoteCompilerDateFile = "${params.greencatRoot}/$KOTLINC_DIR/$KOTLINC_VERSION_FILE"
-        val exists = ssh { cmd("ls $remoteCompilerDateFile && echo OK") }.find { line -> line.trim() == "OK" } != null
         val archiveFile = "kotlinc.zip"
+        val remoteCompilerDateFile = "${params.greencatRoot}/$KOTLINC_DIR/$KOTLINC_VERSION_FILE"
+        val remoteZipPath = "${params.greencatRoot}/$archiveFile"
+        val exists = ssh { cmd("ls $remoteCompilerDateFile && echo OK") }.find { line -> line.trim() == "OK" } != null
         ssh { cmd("mkdir -p ${params.greencatRoot}") }
 
         fun downloadUpdate(version: String, artifactUrl: String) {
             Log.d("[Compiler] Downloading update... ", newLine = false)
+            val tmpDir = exec("echo \$TMPDIR").firstOrNull() ?: ""
+            val tmpZipPath = "$tmpDir/$archiveFile"
+
+            check(tmpDir.isNotBlank()) { "Unable to get /tmp directory" }
+            exec("curl -s $artifactUrl > $tmpZipPath")
+
+            if (!File(tmpZipPath).exists()) {
+                error("Error downloading $archiveFile to /tmp directory")
+            }
+            exec("scp $tmpZipPath ${params.sshHost}:$remoteZipPath")
+            File(tmpZipPath).delete()
+
             ssh { cmd("rm -rf ${params.greencatRoot}/$KOTLINC_DIR") }
-            ssh { cmd("cd ${params.greencatRoot} && curl -s $artifactUrl > $archiveFile && unzip $archiveFile && rm $archiveFile") }
+            ssh { cmd("cd ${params.greencatRoot} && unzip $archiveFile && rm $archiveFile") }
             ssh { cmd("cd ${params.greencatRoot}/$KOTLINC_DIR && echo \"$version\" > $KOTLINC_VERSION_FILE") }
 
             val isUpdated = ssh { cmd("ls ${params.greencatRoot}/$KOTLINC_DIR/bin/kotlinc && echo OK") }.find { line -> line.trim() == "OK" } != null
