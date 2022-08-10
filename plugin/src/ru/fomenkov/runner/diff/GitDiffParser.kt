@@ -10,7 +10,7 @@ class GitDiffParser {
         var branch = ""
         var untracked = false
 
-        exec("git status")
+        exec("export LANG=en_US; git st")
             .filterNot(String::isBlank)
             .map(String::trim)
             .forEach { line ->
