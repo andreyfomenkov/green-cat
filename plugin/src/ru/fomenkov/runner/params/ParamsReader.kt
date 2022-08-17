@@ -31,6 +31,7 @@ class ParamsReader(
                     testClass = value(Param.TEST_CLASS),
                     testRunner = value(Param.TEST_RUNNER),
                 )
+                Mode.PATCH.mode -> RunnerMode.Patch
                 else -> error("Unknown runner mode: $name")
             }
             RunnerParams(

@@ -22,6 +22,8 @@ sealed class RunnerMode {
     ) : RunnerMode()
 
     object Update : RunnerMode()
+
+    object Patch : RunnerMode()
 }
 
 enum class Param(
@@ -32,7 +34,7 @@ enum class Param(
     PROJECT_ROOT(key = "-p", description = "Android project root directory on the remote host"),
     ANDROID_SDK_ROOT(key = "-s", description = "Android SDK root directory on the remote host"),
     GREENCAT_ROOT(key = "-g", description = "GreenCat root directory on the remote host"),
-    RUNNER_MODE(key = "-m", description = "Runner mode (debug or uitest)"),
+    RUNNER_MODE(key = "-m", description = "Runner mode (debug, uitest or patch)"),
     // Debug runner mode
     COMPONENT_NAME(key = "-c", description = "Component name for main activity in 'debug' mode"),
     // UI test runner mode
@@ -46,5 +48,6 @@ enum class Param(
 
 enum class Mode(val mode: String) {
     DEBUG("debug"),
-    UITEST("uitest")
+    UITEST("uitest"),
+    PATCH("patch"),
 }

@@ -118,6 +118,9 @@ private fun checkApplicationStoragePermissions(params: RunnerParams) {
         is RunnerMode.Debug -> {
             mode.componentName.split("/").first()
         }
+        is RunnerMode.Patch -> {
+            return
+        }
         else -> error("Unexpected runner mode: ${params.mode}")
     }
     val output = exec("adb shell dumpsys package $packageName | grep -i $READ_EXTERNAL_STORAGE_PERMISSION")
@@ -150,6 +153,9 @@ private fun restartApplication(params: RunnerParams) {
         }
         is RunnerMode.UiTest -> {
             // NOP, prelaunching on start
+        }
+        is RunnerMode.Patch -> {
+            // NOP, don't start app
         }
         else -> {
             // NOP
