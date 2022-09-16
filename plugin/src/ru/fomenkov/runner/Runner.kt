@@ -46,8 +46,8 @@ fun main(args: Array<String>) {
         Mixpanel.failed(message = error.message ?: "")
 
         when (error.message.isNullOrBlank()) {
-            true -> Log.e("\n# Process execution failed #")
-            else -> Log.e("\n# Process execution failed: ${error.message} #")
+            true -> Log.e("\n# FAILED #")
+            else -> Log.e("\n# FAILED: ${error.message} #")
         }
     } finally {
         uiTestTaskExecutor.shutdown()
@@ -177,16 +177,16 @@ private fun pushDexToAndroidDevice(params: RunnerParams) {
 }
 
 private fun displayTotalTime(time: Long) {
-    val str = "│  Build & deploy complete in ${formatMillis(time)}  │"
-    val border = "─".repeat(str.length - 2)
+    val str = "|  Build & deploy complete in ${formatMillis(time)}  |"
+    val border = "-".repeat(str.length - 2)
     val space = " ".repeat(str.length - 2)
 
     Log.d("\n")
-    Log.d("╭$border╮")
-    Log.d("│$space│")
+    Log.d("+$border+")
+    Log.d("|$space|")
     Log.d(str)
-    Log.d("│$space│")
-    Log.d("╰$border╯")
+    Log.d("|$space|")
+    Log.d("+$border+")
 }
 
 private fun startGreenCatPlugin(params: RunnerParams) {

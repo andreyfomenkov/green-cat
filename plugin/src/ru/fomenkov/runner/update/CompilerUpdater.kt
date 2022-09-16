@@ -22,7 +22,7 @@ class CompilerUpdater(
         ssh { cmd("mkdir -p ${params.greencatRoot}") }
 
         fun downloadUpdate(version: String, artifactUrl: String) {
-            Log.d("[Compiler] Downloading update... ", newLine = false)
+            Log.d("Downloading compiler... ", newLine = false)
             val tmpDir = exec("echo \$TMPDIR").firstOrNull() ?: ""
             val tmpZipPath = "$tmpDir/$archiveFile"
 
