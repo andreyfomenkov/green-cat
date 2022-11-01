@@ -93,6 +93,7 @@ class ProjectResolver(
         Telemetry.verboseLog("Parsing $modulePath/build.gradle")
         val deps = mutableSetOf<Dependency>()
         val path = "$modulePath/$BUILD_GRADLE_FILE_NAME"
+        val variables = mutableMapOf<String, String>()
 
         File(path).readLines()
             .map { line -> line.trim().replace("\"", "'") }
@@ -109,6 +110,8 @@ class ProjectResolver(
                     val artifact = parts[0].trim()
                     val version = parts[1].replace("\"", "").replace("'", "").trim() // TODO: refactor
                     properties += artifact to version
+                } else if (line.isRootProjectPropertyVariableDefinition()) { // When library version in a separate variable
+                    variables += line.extractRootProjectPropertyVariable()
                 }
                 val dependency = when {
                     line.hasFileTreeImplementationPrefix() -> null // Ignore fileTree declaration for a while
@@ -127,7 +130,7 @@ class ProjectResolver(
                             line.hasLibraryApiPrefix() ||
                             line.hasLibraryAndroidTestImplementationPrefix() ||
                             line.hasLibraryTestImplementationPrefix() -> {
-                        parseLibraryDependency(line)
+                        parseLibraryDependency(variables, line)
                     }
                     else -> null
                 }
@@ -138,6 +141,25 @@ class ProjectResolver(
                 }
             }
         return deps
+    }
+
+    private fun String.isRootProjectPropertyVariableDefinition() = this.run {
+        startsWith("def ") && contains("=") && contains("rootProject") && contains("property")
+    }
+
+    private fun String.extractRootProjectPropertyVariable() = this.run {
+        val nameIndexStart = indexOf("def ")
+        val nameIndexEnd = indexOf("=")
+        check(nameIndexStart in 0 until nameIndexEnd) { "Failed to parse variable name" }
+        val name = substring(nameIndexStart + 3, nameIndexEnd).trim()
+
+        val valueIndexStart = indexOf("'")
+        check(valueIndexStart > 0) { "Failed to parse variable value (start index)" }
+        val valueIndexEnd = indexOf("'", valueIndexStart + 1)
+        check(valueIndexEnd > 0) { "Failed to parse variable value (end index)" }
+        val value = substring(valueIndexStart + 1, valueIndexEnd).trim()
+
+        name to value
     }
 
     /**
@@ -641,7 +663,7 @@ class ProjectResolver(
         }
     }
 
-    private fun parseLibraryDependency(line: String): Dependency? {
+    private fun parseLibraryDependency(variables: Map<String, String>, line: String): Dependency? {
         val relation = when {
             line.hasLibraryImplementationPrefix() -> Relation.IMPLEMENTATION
             line.hasLibraryApiPrefix() -> Relation.API
@@ -651,20 +673,33 @@ class ProjectResolver(
         }
         val extractVersion = { arg: String ->
             val lastColonIndex = arg.lastIndexOf(":")
-            arg.substring(lastColonIndex + 1, arg.length).run {
-                split("'")
-                    // TODO: refactor
-                    .map { part ->
-                        if (part.startsWith("\${") && part.endsWith("}")) {
-                            part.substring(part.indexOf("{") + 1, part.indexOf("}"))
-                        } else {
-                            part
+
+            fun extract(arg: String) = arg.substring(lastColonIndex + 1, arg.length)
+                .split("'") // TODO: refactor
+                .map { part ->
+                    if (part.startsWith("\${") && part.endsWith("}")) {
+                        part.substring(part.indexOf("{") + 1, part.indexOf("}"))
+                    } else {
+                        part
+                    }
+                }
+                .map { part -> part.replace("@aar", "") } // TODO: refactor
+                .find { part -> isVersionOrPlaceholder(part) }
+
+            var result = extract(arg)
+
+            if (result == null) {
+                variables.forEach { (name, value) ->
+                    if ("$$name" in arg) {
+                        result = extract(arg.replace("$$name", value))
+
+                        if (result != null) {
+                            return@forEach
                         }
                     }
-                    .map { part ->
-                    part.replace("@aar", "") // TODO: refactor
-                }.find(::isVersionOrPlaceholder) ?: error("[Library dependency] Failed to extract version: $arg")
+                }
             }
+            result ?: error("[Library dependency] Failed to extract version: $arg")
         }
         val artifact: String
         var version: String? = null

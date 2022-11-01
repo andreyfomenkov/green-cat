@@ -27,6 +27,7 @@ dependencies {
     implementation("com.google.android:library:" + rootProject["library_c.version"] + ':all')
     implementation fileTree(dir: 'libs', include: ['*.jar']) // Ignored
     implementation "me.leolin:ShortcutBadger:1.1.22@aar"
+
     // Don't parse compound version, use the latest JAR or AAR for the given dependency
     implementation("com.android:library-controls:${rootProject['library_d.version']}-firebase-support-notify-support-${rootProject['library_e.version']}@aar")
     testImplementation "com.google.guava:guava:${project.ext.guavaVersion}"
@@ -37,6 +38,10 @@ dependencies {
     androidTestImplementation ('com.android:test-library:1.6.65:all')
     api "com.google.firebase:firebase-messaging"
     implementation 'com.google.firebase:firebase-crashlytics'
+
+    // Version in a separate variable
+    def myLib_version = rootProject.property("library_b.version")
+    api("androidx.emoji:emoji-appcompat:$myLib_version") {
 }
 
 some_other_stuff {

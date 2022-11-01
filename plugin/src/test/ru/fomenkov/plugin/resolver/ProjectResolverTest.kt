@@ -164,6 +164,13 @@ class ProjectResolverTest {
         )
             .assertContainsAndDelete(deps)
 
+        Dependency.Library(
+            artifact = "androidx.emoji:emoji-appcompat",
+            version = "library_b.version",
+            relation = Relation.API
+        )
+            .assertContainsAndDelete(deps)
+
         assertTrue(
             deps.isEmpty(),
             "Collection is not empty. The following item(s) are left:\n${formatDepsListMessage(deps)}"
