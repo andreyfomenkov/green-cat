@@ -80,7 +80,6 @@ private fun launch(args: Array<String>): RunnerParams? {
 
     } else {
         checkSingleAndroidDeviceConnected()
-        checkApplicationStoragePermissions(params)
         val supported = checkGitDiff()
 
         if (supported == null) {
@@ -108,35 +107,6 @@ private fun checkSingleAndroidDeviceConnected() {
         1 -> Telemetry.log("Device '${devices.first()}' connected (API ${getApiLevel()})")
         else -> error("Multiple devices connected")
     }
-}
-
-private fun checkApplicationStoragePermissions(params: RunnerParams) {
-    val packageName = when (val mode = params.mode) {
-        is RunnerMode.UiTest -> {
-            mode.appPackage
-        }
-        is RunnerMode.Debug -> {
-            mode.componentName.split("/").first()
-        }
-        is RunnerMode.Patch -> {
-            return
-        }
-        else -> error("Unexpected runner mode: ${params.mode}")
-    }
-    val output = exec("adb shell dumpsys package $packageName | grep -i $READ_EXTERNAL_STORAGE_PERMISSION")
-        .map { line -> line.lowercase().replace(" ", "") }
-
-    if (output.isEmpty()) {
-        error("No package '$packageName' installed")
-    }
-    output.forEach { line ->
-        if (line.contains("granted=true")) {
-            return
-        } else if (line.contains("granted=false")) {
-            error("Package '$packageName' has no external storage permission")
-        }
-    }
-    error("Unable to check storage permissions for package '$packageName'")
 }
 
 private fun restartApplication(params: RunnerParams) {
