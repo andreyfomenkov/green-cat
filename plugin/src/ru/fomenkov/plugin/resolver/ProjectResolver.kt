@@ -815,7 +815,7 @@ class ProjectResolver(
     // Library
     private fun String.hasLibraryImplementationPrefix() = collapse().startsWith("implementation")
 
-    private fun String.hasLibraryApiPrefix() = collapse().startsWith("api")
+    private fun String.hasLibraryApiPrefix() = collapse().startsWith("api") && !collapse().startsWith("apiLevel")
 
     private fun String.hasLibraryAndroidTestImplementationPrefix() = collapse().startsWith("androidTestImplementation")
 

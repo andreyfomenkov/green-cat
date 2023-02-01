@@ -5,7 +5,6 @@ import ru.fomenkov.plugin.util.Telemetry
 import ru.fomenkov.plugin.util.exec
 import ru.fomenkov.plugin.util.noTilda
 import java.io.File
-import java.lang.StringBuilder
 
 class MetadataArtifactDependencyResolver(
     private val jetifiedJarRepository: JetifiedJarRepository,

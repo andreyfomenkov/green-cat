@@ -42,6 +42,8 @@ dependencies {
     // Version in a separate variable
     def myLib_version = rootProject.property("library_b.version")
     api("androidx.emoji:emoji-appcompat:$myLib_version") {
+
+    apiLevel = 31 // Ignore and don't try to parse as api dependency prefix
 }
 
 some_other_stuff {
