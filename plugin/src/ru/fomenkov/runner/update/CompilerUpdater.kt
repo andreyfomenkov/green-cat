@@ -32,7 +32,7 @@ class CompilerUpdater(
             if (!File(tmpZipPath).exists()) {
                 error("Error downloading $archiveFile to /tmp directory")
             }
-            exec("scp $tmpZipPath ${params.sshHost}:$remoteZipPath")
+            exec("rsync $tmpZipPath ${params.sshHost}:$remoteZipPath")
             File(tmpZipPath).delete()
 
             ssh { cmd("rm -rf ${params.greencatRoot}/$KOTLINC_DIR") }

@@ -137,7 +137,7 @@ private fun pushDexToAndroidDevice(params: RunnerParams) {
     val tmpDir = exec("echo \$TMPDIR").firstOrNull() ?: ""
     check(tmpDir.isNotBlank()) { "Failed to get /tmp directory" }
 
-    exec("scp ${params.sshHost}:${params.greencatRoot}/$DEX_FILES_DIR/$OUTPUT_DEX_FILE $tmpDir")
+    exec("rsync ${params.sshHost}:${params.greencatRoot}/$DEX_FILES_DIR/$OUTPUT_DEX_FILE $tmpDir")
     val output = exec("adb push $tmpDir/$OUTPUT_DEX_FILE $ANDROID_DEVICE_DEX_DIR/$OUTPUT_DEX_FILE")
 
     if (output.find { line -> line.contains("error:") } != null) {
@@ -242,7 +242,7 @@ private fun syncWithMainframer(
     }
     supported.forEach { path ->
         val dstPath = "${params.sshHost}:${params.greencatRoot}/$SOURCE_FILES_DIR/$path"
-        exec("scp $path $dstPath").forEach { Log.d("[SCP] $it") }
+        exec("rsync $path $dstPath").forEach { Log.d("[RSYNC] $it") }
     }
     val copiedSources = ssh { cmd("find ${params.greencatRoot}/$SOURCE_FILES_DIR") }
         .map(String::trim)
@@ -264,7 +264,7 @@ private fun readParams(args: Array<String>) = when (args.isEmpty()) {
 }
 
 private fun validateShellCommands() {
-    listOf("git", "adb", "find", "rm", "ls", "ssh", "scp", "curl").forEach { cmd ->
+    listOf("git", "adb", "find", "rm", "ls", "ssh", "rsync", "curl").forEach { cmd ->
         val exists = exec("command -v $cmd").isNotEmpty()
 
         if (!exists) {
@@ -287,7 +287,6 @@ const val ANDROID_DEVICE_DEX_DIR = "/data/local/tmp"
 const val OUTPUT_DEX_FILE = "patch.dex"
 const val PLUGIN_UPDATE_TIMESTAMP_FILE = "greencat_update"
 const val COMPILER_UPDATE_TIMESTAMP_FILE = "compiler_update"
-const val READ_EXTERNAL_STORAGE_PERMISSION = "android.permission.READ_EXTERNAL_STORAGE"
 const val FINAL_ERROR_MESSAGE_DELAY = 100L
 const val WAIT_PATCH_DELAY = 60000L
 const val ERROR_MESSAGE_LENGTH_LIMIT = 150

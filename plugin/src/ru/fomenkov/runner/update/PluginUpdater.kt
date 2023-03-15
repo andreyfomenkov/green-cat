@@ -35,7 +35,7 @@ class PluginUpdater(
             if (!isDeleted) {
                 error("Failed to delete old JAR version on the remote host")
             }
-            exec("scp $tmpJarPath ${params.sshHost}:$remoteJarPath")
+            exec("rsync $tmpJarPath ${params.sshHost}:$remoteJarPath")
             val isUpdated = ssh { cmd("ls $remoteJarPath && echo OK") }.find { line -> line.trim() == "OK" } != null
 
             when {
