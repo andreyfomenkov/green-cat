@@ -1,12 +1,17 @@
 package ru.fomenkov.plugin.repository
 
 import ru.fomenkov.plugin.util.CURRENT_DIR
-import ru.fomenkov.plugin.util.HOME_DIR
+import ru.fomenkov.plugin.util.exec
+import ru.fomenkov.plugin.util.noTilda
 import java.io.File
 
 class ClasspathOptimizer {
+    private val transformsDir = "~/.gradle/caches/transforms-3".noTilda()
+    private val modulesDir = "~/.gradle/caches/modules-2/files-2.1".noTilda()
 
     fun optimize(classpath: Set<String>): Set<String> {
+        createSymlinks()
+
         return classpath
             .asSequence()
             .map(::Entry)
@@ -23,20 +28,19 @@ class ClasspathOptimizer {
                 if (path.startsWith(CURRENT_DIR)) {
                     path.substring(CURRENT_DIR.length + 1, path.length)
                 } else {
-                    toRelativePath(path)
+                    path
+                        .replace(transformsDir, transformsDir.dirName())
+                        .replace(modulesDir, modulesDir.dirName())
                 }
             }.toSet()
     }
 
-    private fun toRelativePath(path: String): String {
-        val partsCount = CURRENT_DIR.subSequence(HOME_DIR.length + 1, CURRENT_DIR.length).split("/").size
-        val parts = path.split("/").filter { part -> part.isNotBlank() }.toMutableList()
-
-        for (i in 0 until partsCount) {
-            parts[i] = ".."
-        }
-        return parts.joinToString(separator = "/")
+    private fun createSymlinks() {
+        exec("ln -s $transformsDir .")
+        exec("ln -s $modulesDir .")
     }
+
+    private fun String.dirName() = split("/").last()
 
     private data class Entry(val path: String) {
 

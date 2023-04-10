@@ -157,7 +157,10 @@ class CompileTask(
             javac = "javac"
         }
         Telemetry.verboseLog("Using Java compiler: $javac")
-        val lines = exec("$javac -source 1.8 -target 1.8 -encoding utf-8 -g -cp $moduleClasspath -d $classDir $srcFilesLine")
+        val cmd = "$javac -source 1.8 -target 1.8 -encoding utf-8 -g -cp $moduleClasspath -d $classDir $srcFilesLine"
+        val lines = exec(cmd)
+        Telemetry.log("Java compilation command length = ${cmd.length}, MAX_ARG_STRLEN = 131072")
+
         val inputFileNames = srcFiles.map { path -> File(path).nameWithoutExtension }.toSet()
         val outputFileNames = exec("find $classDir -name '*.class'").map { path -> File(path).nameWithoutExtension }.toSet()
 
@@ -179,6 +182,8 @@ class CompileTask(
         val moduleNameArg = "-module-name ${moduleName.replace("-", "_")}_debug"
         val friendPaths = getFriendModulePaths(moduleName, moduleClasspath).joinToString(separator = ",")
         val cmd = "$kotlinc -Xjvm-default=all-compatibility -Xfriend-paths=$friendPaths $moduleNameArg -d $classDir -classpath $moduleClasspath $srcFilesLine"
+        Telemetry.log("Kotlin compilation command length = ${cmd.length}, MAX_ARG_STRLEN = 131072")
+
         val lines = exec(cmd)
         val inputFileNames = srcFiles.map { path -> File(path).nameWithoutExtension }.toSet()
         val outputFileNames = exec("find $classDir -name '*.class'").map { path -> File(path).nameWithoutExtension }.toSet()
